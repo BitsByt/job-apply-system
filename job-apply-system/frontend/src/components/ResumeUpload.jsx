@@ -18,7 +18,7 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
     setLoading(true);
     setMessage("");
     try {
-      const response = await axios.post("http://localhost:3000/generate-resume", { jobTitle, companyName });
+      const response = await axios.post("https://job-apply-system-backend-7i1m.onrender.com/generate-resume", { jobTitle, companyName });
       setResume(response.data.resume);
     } catch {
       setMessage("Failed to generate resume.");

@@ -21,7 +21,7 @@ function CoverLetter({ jobTitle, companyName, isDark }) {
     setMessage("");
     setEditing(false);
     try {
-      const response = await axios.post("http://localhost:3000/cover-letter", { jobTitle, companyName });
+      const response = await axios.post("https://job-apply-system-backend-7i1m.onrender.com/cover-letter", { jobTitle, companyName });
       setLetter(response.data.letter);
     } catch {
       setMessage("Failed to generate cover letter.");

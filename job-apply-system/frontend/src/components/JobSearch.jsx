@@ -39,7 +39,7 @@ function JobSearch({
     setLoading(true); setMessage(""); setSearched(true);
     const query = activeFilters.length > 0 ? `${title} ${activeFilters.join(' ')}` : title;
     try {
-      const response = await axios.get("http://localhost:3000/jobs", { params: { title: query, location } });
+      const response = await axios.get("https://job-apply-system-backend-7i1m.onrender.com/jobs", { params: { title: query, location } });
       setJobs(response.data);
       if (response.data.length === 0) setMessage("No jobs found. Try a different search.");
     } catch {
@@ -50,7 +50,7 @@ function JobSearch({
 
   async function handleApply(job) {
     try {
-      await axios.post("http://localhost:3000/applications", {
+      await axios.post("https://job-apply-system-backend-7i1m.onrender.com/applications", {
         jobTitle: job.job_title, companyName: job.employer_name, jobLink: job.job_apply_link
       });
       alert("Application saved to tracker!");

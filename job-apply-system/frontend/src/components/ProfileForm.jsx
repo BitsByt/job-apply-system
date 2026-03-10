@@ -9,7 +9,7 @@ function ProfileForm({ isDark, form, setForm, message, setMessage }) {
   async function handleSubmit(e) {
     e.preventDefault();
     try {
-      const response = await axios.post("http://localhost:3000/profile", form);
+      const response = await axios.post("https://job-apply-system-backend-7i1m.onrender.com/profile", form);
       setMessage(response.data.message);
     } catch {
       setMessage("Something went wrong. Is the backend running?");

@@ -27,14 +27,14 @@ function ApplicationTracker({ isDark }) {
   const emptyHint   = isDark ? '#1e3a5f' : '#6a9ab0';
 
   useEffect(() => {
-    axios.get("http://localhost:3000/applications")
+    axios.get("https://job-apply-system-backend-7i1m.onrender.com/applications")
       .then((res) => setApplications(res.data))
       .catch(() => console.error("Failed to fetch applications."));
   }, []);
 
   async function fetchApplications() {
     try {
-      const response = await axios.get("http://localhost:3000/applications");
+      const response = await axios.get("https://job-apply-system-backend-7i1m.onrender.com/applications");
       setApplications(response.data);
     } catch {
       console.error("Failed to fetch applications.");
@@ -43,7 +43,7 @@ function ApplicationTracker({ isDark }) {
 
   async function handleStatusChange(id, status) {
     try {
-      await axios.patch(`http://localhost:3000/applications/${id}`, { status });
+      await axios.patch(`https://job-apply-system-backend-7i1m.onrender.com/applications/${id}`, { status });
       fetchApplications();
     } catch {
       console.error("Failed to update status.");
@@ -52,7 +52,7 @@ function ApplicationTracker({ isDark }) {
 
   async function handleDelete(id) {
     try {
-      await axios.delete(`http://localhost:3000/applications/${id}`);
+      await axios.delete(`https://job-apply-system-backend-7i1m.onrender.com/applications/${id}`);
       fetchApplications();
     } catch {
       console.error("Failed to delete application.");

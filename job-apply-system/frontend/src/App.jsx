@@ -79,7 +79,7 @@ function App() {
 
   async function handleLogout() {
     try {
-      await axios.post("http://localhost:3000/auth/logout");
+      await axios.post("https://job-apply-system-backend-7i1m.onrender.com/auth/logout");
     } catch (_) {}
     setToken(null);
     setUser(null);
