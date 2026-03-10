@@ -36,7 +36,8 @@ export default function Auth({ onLogin, isDark }) {
         setMode("login");
         setPassword("");
       } else {
-        onLogin(data.token, data.user ?? { email });
+        console.log("Login response:", data);
+onLogin(data.token, data.user ?? { email });
       }
     } catch (err) {
       setMessage(err.response?.data?.message || err.response?.data?.error || "Something went wrong.");
