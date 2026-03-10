@@ -4,54 +4,61 @@ import axios from "axios";
 const BASE = "https://job-apply-system-backend-7i1m.onrender.com";
 
 export default function Auth({ onLogin, isDark }) {
-  const [mode, setMode] = useState("login"); // "login" | "register"
+  const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   const t = {
-    bg:        isDark ? 'radial-gradient(ellipse at top, #0a1f3c 0%, #050d1a 60%)' : 'radial-gradient(ellipse at top, #d0eaf7 0%, #eef6fb 60%)',
-    card:      isDark ? 'rgba(8,15,31,0.95)' : 'rgba(255,255,255,0.95)',
-    border:    isDark ? 'rgba(0,180,216,0.15)' : 'rgba(0,150,200,0.2)',
-    primary:   isDark ? '#00b4d8' : '#0077b6',
-    text:      isDark ? '#caf0f8' : '#0d2035',
-    muted:     isDark ? '#4a7fa5' : '#4a7a9b',
-    inputBg:   isDark ? 'rgba(0,180,216,0.05)' : 'rgba(240,248,255,0.9)',
-    h1:        isDark ? '#00e5ff' : '#0077b6',
-    error:     '#f87171',
-    success:   '#10b981',
+    bg:      isDark ? 'radial-gradient(ellipse at top, #0a1f3c 0%, #050d1a 60%)' : 'radial-gradient(ellipse at top, #d0eaf7 0%, #eef6fb 60%)',
+    card:    isDark ? 'rgba(8,15,31,0.95)' : 'rgba(255,255,255,0.95)',
+    border:  isDark ? 'rgba(0,180,216,0.15)' : 'rgba(0,150,200,0.2)',
+    primary: isDark ? '#00b4d8' : '#0077b6',
+    text:    isDark ? '#caf0f8' : '#0d2035',
+    muted:   isDark ? '#4a7fa5' : '#4a7a9b',
+    inputBg: isDark ? 'rgba(0,180,216,0.05)' : 'rgba(240,248,255,0.9)',
+    h1:      isDark ? '#00e5ff' : '#0077b6',
+    error:   '#f87171',
+    success: '#10b981',
   };
 
-async function handleSubmit() {
-  if (!email || !password) return setMessage("Please fill in all fields.");
-  setLoading(true);
-  setMessage("");
-  try {
-    const endpoint = mode === "login" ? "/auth/login" : "/auth/register";
-    const { data } = await axios.post(`${BASE}${endpoint}`, { email, password });
+  async function handleSubmit() {
+    if (!email || !password) return setMessage("Please fill in all fields.");
+    setLoading(true);
+    setMessage("");
+    try {
+      const endpoint = mode === "login" ? "/auth/login" : "/auth/register";
+      const { data } = await axios.post(`${BASE}${endpoint}`, { email, password });
 
-    if (mode === "register") {
-      setMessage("Account created! Please log in.");
-      setMode("login");
-      setPassword("");
-      setLoading(false);
-    } else {
-      const token = data.token || data.access_token || data.accessToken || data.jwt;
-      const user = data.user || { email };
-      if (!token) {
-        setMessage("Login failed: no token received.");
+      if (mode === "register") {
+        setMessage("Account created! Please log in.");
+        setMode("login");
+        setPassword("");
         setLoading(false);
-        return;
+      } else {
+        // Supabase returns token at data.session.access_token
+        const token = data.session?.access_token
+          || data.token
+          || data.access_token
+          || data.accessToken
+          || data.jwt;
+        const user = data.user || { email };
+
+        if (!token) {
+          setMessage("Login failed: no token received.");
+          setLoading(false);
+          return;
+        }
+
+        setLoading(false);
+        onLogin(token, user);
       }
-      setLoading(false);   // ← must come BEFORE onLogin
-      onLogin(token, user);
+    } catch (err) {
+      setMessage(err.response?.data?.message || err.response?.data?.error || "Something went wrong.");
+      setLoading(false);
     }
-  } catch (err) {
-    setMessage(err.response?.data?.message || err.response?.data?.error || "Something went wrong.");
-    setLoading(false);
   }
-}
 
   const inputStyle = {
     width: '100%',
@@ -85,7 +92,7 @@ async function handleSubmit() {
     <div style={{ minHeight: '100vh', backgroundImage: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Segoe UI', sans-serif" }}>
       <div style={{ width: '100%', maxWidth: '400px', padding: '0 24px' }}>
 
-        {/* Logo / title */}
+        {/* Title */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <h1 style={{ fontSize: '2rem', color: t.h1, margin: '0 0 6px 0', letterSpacing: '1px' }}>
             Just Apply Smart
