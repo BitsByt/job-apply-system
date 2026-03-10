@@ -135,7 +135,7 @@ export default function Auth({ onLogin, isDark }) {
         </div>
 
         <p style={{ textAlign: 'center', color: t.muted, fontSize: '12px', marginTop: '20px' }}>
-          Built with React + Node.js · Powered by Groq AI
+          Built with React + Node.js · Powered by Groq AI · Built by Elijah Ethanli D. Escondo
         </p>
       </div>
     </div>
