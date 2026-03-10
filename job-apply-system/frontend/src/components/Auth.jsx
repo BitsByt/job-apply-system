@@ -23,27 +23,35 @@ export default function Auth({ onLogin, isDark }) {
     success:   '#10b981',
   };
 
-  async function handleSubmit() {
-    if (!email || !password) return setMessage("Please fill in all fields.");
-    setLoading(true);
-    setMessage("");
-    try {
-      const endpoint = mode === "login" ? "/auth/login" : "/auth/register";
-      const { data } = await axios.post(`${BASE}${endpoint}`, { email, password });
+async function handleSubmit() {
+  if (!email || !password) return setMessage("Please fill in all fields.");
+  setLoading(true);
+  setMessage("");
+  try {
+    const endpoint = mode === "login" ? "/auth/login" : "/auth/register";
+    const { data } = await axios.post(`${BASE}${endpoint}`, { email, password });
 
-      if (mode === "register") {
-        setMessage("Account created! Please log in.");
-        setMode("login");
-        setPassword("");
-      } else {
-        console.log("Login response:", data);
-onLogin(data.token, data.user ?? { email });
+    if (mode === "register") {
+      setMessage("Account created! Please log in.");
+      setMode("login");
+      setPassword("");
+      setLoading(false);
+    } else {
+      const token = data.token || data.access_token || data.accessToken || data.jwt;
+      const user = data.user || { email };
+      if (!token) {
+        setMessage("Login failed: no token received.");
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      setMessage(err.response?.data?.message || err.response?.data?.error || "Something went wrong.");
+      setLoading(false);   // ← must come BEFORE onLogin
+      onLogin(token, user);
     }
+  } catch (err) {
+    setMessage(err.response?.data?.message || err.response?.data?.error || "Something went wrong.");
     setLoading(false);
   }
+}
 
   const inputStyle = {
     width: '100%',
