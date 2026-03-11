@@ -1,12 +1,15 @@
 import { useState } from "react";
 import axios from "axios";
 
-function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
+const BASE = "https://job-apply-system-backend-7i1m.onrender.com";
+
+function ResumeGenerator({ jobTitle, companyName, isDark }) {
   const [resume, setResume] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [downloading, setDownloading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
 
   const accent      = isDark ? '#00b4d8' : '#0077b6';
@@ -22,12 +25,24 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
     setEditing(false);
     setSaved(false);
     try {
-      const response = await axios.post("https://job-apply-system-backend-7i1m.onrender.com/generate-resume", { jobTitle, companyName });
+      const response = await axios.post(`${BASE}/generate-resume`, { jobTitle, companyName });
       setResume(response.data.resume);
     } catch {
       setMessage("Failed to generate resume.");
     }
     setLoading(false);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await axios.post(`${BASE}/saved-resumes`, { jobTitle, companyName, content: resume });
+      setSaved(true);
+      setMessage("");
+    } catch {
+      setMessage("Failed to save resume.");
+    }
+    setSaving(false);
   }
 
   function sanitizeForPDF(text) {
@@ -39,14 +54,15 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
       .replace(/\u2022/g, '*')
       .replace(/\u2026/g, '...')
       .replace(/[^\x00-\x7F]/g, (c) => {
-        const map = { 'á':'a','à':'a','ä':'a','é':'e','è':'e',
-                      'á':'a','à':'a','ä':'a','â':'a','ã':'a',
-                      'é':'e','è':'e','ë':'e','ê':'e',
-                      'í':'i','ì':'i','ï':'i','î':'i',
-                      'ó':'o','ò':'o','ö':'o','ô':'o',
-                      'ú':'u','ù':'u','ü':'u','û':'u',
-                      'ñ':'n','ç':'c',
-                      'Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U','Ñ':'N' };
+        const map = {
+          'á':'a','à':'a','ä':'a','â':'a','ã':'a',
+          'é':'e','è':'e','ë':'e','ê':'e',
+          'í':'i','ì':'i','ï':'i','î':'i',
+          'ó':'o','ò':'o','ö':'o','ô':'o',
+          'ú':'u','ù':'u','ü':'u','û':'u',
+          'ñ':'n','ç':'c',
+          'Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U','Ñ':'N',
+        };
         return map[c] || '';
       });
   }
@@ -59,8 +75,7 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
       const doc = new jsPDF({ unit: 'mm', format: 'a4' });
       await loadGaramond(doc);
 
-      const ml = 19;
-      const mr = 19;
+      const ml = 19, mr = 19;
       const pageW = doc.internal.pageSize.getWidth();
       const pageH = doc.internal.pageSize.getHeight();
       const contentW = pageW - ml - mr;
@@ -85,9 +100,9 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
 
       const headerLines = [...(sections['HEADER'] || []), ...(sections['CONTACT'] || [])].filter(l => l.trim());
       const name = headerLines[0] || '';
-      const contactLines = headerLines.slice(1);
+      const contactStr = headerLines.slice(1).join('  |  ');
 
-      doc.setFont('EBGaramond', 'bold');
+     doc.setFont('helvetica', 'bold');
       doc.setFontSize(24);
       doc.setTextColor(...ACCENT);
       doc.text(sanitizeForPDF(name), pageW / 2, y, { align: 'center' });
@@ -98,12 +113,12 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
       doc.line(ml + 10, y, pageW - mr - 10, y);
       y += 4;
 
-      const contactStr = contactLines.join('  |  ');
-      doc.setFont('EBGaramond', 'normal');
+     doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(...GRAY);
-      const contactWrapped = doc.splitTextToSize(sanitizeForPDF(contactStr), contentW);
-      contactWrapped.forEach(cl => { doc.text(cl, pageW / 2, y, { align: 'center' }); y += 5; });
+      doc.splitTextToSize(sanitizeForPDF(contactStr), contentW).forEach(cl => {
+        doc.text(cl, pageW / 2, y, { align: 'center' }); y += 5;
+      });
       y += 3;
 
       function sectionHeader(title) {
@@ -111,67 +126,42 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
         y += 3;
         doc.setFillColor(...ACCENT);
         doc.rect(ml, y - 4, 2.5, 5.5, 'F');
-        doc.setFont('EBGaramond', 'bold');
-        doc.setFontSize(10.5);
-        doc.setTextColor(...ACCENT);
+       doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(...ACCENT);
         doc.text(title.toUpperCase(), ml + 5, y);
         y += 1.5;
-        doc.setDrawColor(...LIGHT);
-        doc.setLineWidth(0.3);
-        doc.line(ml, y, pageW - mr, y);
-        y += 4;
+        doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3);
+        doc.line(ml, y, pageW - mr, y); y += 4;
       }
 
       function renderLines(rawLines) {
         for (const line of rawLines) {
           const t = line.trim();
           if (!t) { y += 1.5; continue; }
-
-          const isBullet = t.startsWith('-') || t.startsWith('*') || t.startsWith('•');
-          const text = isBullet ? t.replace(/^[-*•]\s*/, '') : t;
-          const bulletIndent = ml + 5;
-          const availW = isBullet ? contentW - 5 : contentW;
+          const isBullet = t.startsWith('-') || t.startsWith('*') || t.startsWith('\u2022');
+          const text = isBullet ? t.replace(/^[-*\u2022]\s*/, '') : t;
+          const availW = contentW - (isBullet ? 5 : 0);
           const dateMatch = text.match(/^(.+?)\s{2,}(.{4,35})$/);
-
           if (dateMatch && /\d{4}/.test(dateMatch[2])) {
             safePage();
-            const leftText = dateMatch[1].trim();
-            const rightText = dateMatch[2].trim();
-            const isRole = /intern|developer|engineer|analyst|manager|designer|associate|nurse|officer|assistant|coordinator/i.test(leftText);
-            doc.setFont('EBGaramond', isRole ? 'italic' : 'bold');
-            doc.setFontSize(9.5);
-            doc.setTextColor(...BLACK);
-            doc.text(sanitizeForPDF(leftText), ml, y);
-            doc.setFont('EBGaramond', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(...GRAY);
-            doc.text(sanitizeForPDF(rightText), pageW - mr, y, { align: 'right' });
+            const isRole = /intern|developer|engineer|analyst|manager|designer|associate|nurse|officer|assistant|coordinator/i.test(dateMatch[1]);
+           doc.setFont('helvetica', isRole ? 'italic' : 'bold'); doc.setFontSize(9.5); doc.setTextColor(...BLACK);
+            doc.text(sanitizeForPDF(dateMatch[1].trim()), ml, y);
+           doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...GRAY);
+            doc.text(sanitizeForPDF(dateMatch[2].trim()), pageW - mr, y, { align: 'right' });
             y += 5;
           } else if (isBullet) {
             safePage();
-            doc.setFont('EBGaramond', 'normal');
-            doc.setFontSize(9.5);
-            doc.setTextColor(...BLACK);
+           doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...BLACK);
             doc.setFillColor(...ACCENT);
             doc.circle(ml + 1.5, y - 1.2, 0.9, 'F');
             const wrapped = doc.splitTextToSize(sanitizeForPDF(text), availW);
-            wrapped.forEach((wl, i) => {
-              safePage();
-              doc.text(wl, bulletIndent, y);
-              if (i < wrapped.length - 1) y += 5;
-            });
+            wrapped.forEach((wl, i) => { safePage(); doc.text(wl, ml + 5, y); if (i < wrapped.length - 1) y += 5; });
             y += 5;
           } else {
             safePage();
-            doc.setFont('EBGaramond', 'normal');
-            doc.setFontSize(9.5);
-            doc.setTextColor(...BLACK);
+           doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...BLACK);
             const wrapped = doc.splitTextToSize(sanitizeForPDF(text), availW);
-            wrapped.forEach((wl, i) => {
-              safePage();
-              doc.text(wl, ml, y);
-              if (i < wrapped.length - 1) y += 5;
-            });
+            wrapped.forEach((wl, i) => { safePage(); doc.text(wl, ml, y); if (i < wrapped.length - 1) y += 5; });
             y += 5;
           }
         }
@@ -179,20 +169,14 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
 
       const ORDER = ['SUMMARY','EDUCATION','WORK EXPERIENCE','EXPERIENCE','SKILLS','CERTIFICATIONS','PROJECTS','AWARDS','LANGUAGES'];
       const rendered = new Set(['HEADER','CONTACT']);
-
       for (const sec of ORDER) {
-        if (sections[sec] && sections[sec].some(l => l.trim())) {
+        if (sections[sec]?.some(l => l.trim())) {
           sectionHeader(sec === 'WORK EXPERIENCE' ? 'WORK EXPERIENCE' : sec);
-          renderLines(sections[sec]);
-          rendered.add(sec);
+          renderLines(sections[sec]); rendered.add(sec);
         }
       }
-
       for (const [sec, secLines] of Object.entries(sections)) {
-        if (!rendered.has(sec) && secLines.some(l => l.trim())) {
-          sectionHeader(sec);
-          renderLines(secLines);
-        }
+        if (!rendered.has(sec) && secLines.some(l => l.trim())) { sectionHeader(sec); renderLines(secLines); }
       }
 
       doc.save(`${sanitizeForPDF(jobTitle)} CV.pdf`);
@@ -207,9 +191,7 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
     return new Promise((resolve, reject) => {
       if (document.querySelector(`script[src="${src}"]`)) return resolve();
       const script = document.createElement('script');
-      script.src = src;
-      script.onload = resolve;
-      script.onerror = reject;
+      script.src = src; script.onload = resolve; script.onerror = reject;
       document.head.appendChild(script);
     });
   }
@@ -225,7 +207,7 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
         const cssRes = await fetch(`https://fonts.googleapis.com/css?family=${v.query}`);
         const css = await cssRes.text();
         const match = css.match(/url\(([^)]+\.ttf)\)/);
-        if (!match) { console.warn('No TTF URL found for', v.label, css); continue; }
+        if (!match) continue;
         const ttfUrl = match[1].replace(/['"]/g, '');
         const fontRes = await fetch(ttfUrl);
         const buf = await fontRes.arrayBuffer();
@@ -253,8 +235,7 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
             color: isDark ? '#00f5d4' : '#0077b6',
             border: `1px solid ${isDark ? 'rgba(0,245,212,0.3)' : 'rgba(0,119,182,0.3)'}`,
             borderRadius: '8px', cursor: 'pointer',
-            fontWeight: 'bold', fontSize: '13px',
-            transition: 'all 0.2s',
+            fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s',
           }}
         >
           {loading ? "Generating..." : "📄 Generate Resume"}
@@ -271,8 +252,7 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
               color: editing ? '#f59e0b' : textMuted,
               border: `1px solid ${editing ? 'rgba(251,191,36,0.4)' : boxBorder}`,
               borderRadius: '8px', cursor: 'pointer',
-              fontWeight: 'bold', fontSize: '13px',
-              transition: 'all 0.2s',
+              fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s',
             }}
           >
             {editing ? "👁 View" : "✏️ Edit"}
@@ -281,22 +261,25 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
 
         {resume && !saved && (
           <button
-            onClick={() => { onSave(jobTitle, companyName, resume); setSaved(true); }}
+            onClick={handleSave}
+            disabled={saving}
             style={{
               padding: '8px 20px',
               background: 'rgba(16,185,129,0.1)',
               color: '#10b981',
               border: '1px solid rgba(16,185,129,0.3)',
-              borderRadius: '8px', cursor: 'pointer',
+              borderRadius: '8px', cursor: saving ? 'not-allowed' : 'pointer',
               fontWeight: 'bold', fontSize: '13px',
+              opacity: saving ? 0.7 : 1,
             }}
           >
-            💾 Save to Resume Tab
+            {saving ? "Saving..." : "💾 Save to Resume Tab"}
           </button>
         )}
         {saved && (
           <span style={{ fontSize: '13px', color: '#10b981', padding: '8px 4px' }}>✅ Saved to Resume tab</span>
         )}
+
         {resume && (
           <button
             onClick={handleDownloadPDF}
@@ -304,8 +287,7 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
             style={{
               padding: '8px 20px',
               background: isDark ? 'rgba(0,180,216,0.08)' : 'rgba(0,150,200,0.1)',
-              color: accent,
-              border: `1px solid ${boxBorder}`,
+              color: accent, border: `1px solid ${boxBorder}`,
               borderRadius: '8px', cursor: downloading ? 'not-allowed' : 'pointer',
               fontWeight: 'bold', fontSize: '13px',
               opacity: downloading ? 0.6 : 1, transition: 'all 0.2s',
@@ -325,20 +307,13 @@ function ResumeGenerator({ jobTitle, companyName, isDark, onSave }) {
               value={resume}
               onChange={e => { setResume(e.target.value); setSaved(false); }}
               style={{
-                width: '100%',
-                minHeight: '380px',
+                width: '100%', minHeight: '380px',
                 background: editBg,
                 border: `1.5px solid ${isDark ? 'rgba(251,191,36,0.35)' : 'rgba(251,191,36,0.5)'}`,
-                borderRadius: '10px',
-                padding: '16px',
-                fontSize: '13px',
-                lineHeight: 1.7,
-                color: textPrimary,
-                fontFamily: 'monospace',
-                resize: 'vertical',
-                outline: 'none',
-                boxSizing: 'border-box',
-                transition: 'background 0.3s, color 0.3s',
+                borderRadius: '10px', padding: '16px',
+                fontSize: '13px', lineHeight: 1.7, color: textPrimary,
+                fontFamily: 'monospace', resize: 'vertical', outline: 'none',
+                boxSizing: 'border-box', transition: 'background 0.3s, color 0.3s',
               }}
             />
             <span style={{

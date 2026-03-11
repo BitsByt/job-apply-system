@@ -60,7 +60,6 @@ function App() {
     catch { return null; }
   });
 
-  // Set axios default auth header whenever token changes
   useEffect(() => {
     if (token) {
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
@@ -86,14 +85,12 @@ function App() {
     localStorage.removeItem("jas_token");
     localStorage.removeItem("jas_user");
     delete axios.defaults.headers.common["Authorization"];
-    // Reset app state
     setProfileForm({
       fullName: "", email: "", phone: "", location: "",
       linkedin: "", portfolio: "", skills: "", languages: "",
       certifications: "", summary: "", experience: "",
       education: "", projects: "", awards: "",
     });
-    setSavedResumes([]);
     setJobs([]);
     setPage("profile");
   }
@@ -117,23 +114,6 @@ function App() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [selectedResumeJob, setSelectedResumeJob] = useState(null);
 
-  // ─── Saved resumes ────────────────────────────────────────────────────────
-  const [savedResumes, setSavedResumes] = useState([]);
-
-  function handleSaveResume(jobTitle, companyName, content) {
-    setSavedResumes(prev => [{
-      id: Date.now(),
-      jobTitle,
-      companyName,
-      content,
-      date: new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }),
-    }, ...prev]);
-  }
-
-  function handleDeleteResume(id) {
-    setSavedResumes(prev => prev.filter(r => r.id !== id));
-  }
-
   // ─── Show auth screen if not logged in ───────────────────────────────────
   if (!token) {
     return <Auth onLogin={handleLogin} isDark={isDark} />;
@@ -148,11 +128,7 @@ function App() {
       />
     );
     if (page === "resume") return (
-      <ResumeUpload
-        isDark={isDark}
-        savedResumes={savedResumes}
-        onDeleteResume={handleDeleteResume}
-      />
+      <ResumeUpload isDark={isDark} />
     );
     if (page === "jobs") return (
       <JobSearch
@@ -165,7 +141,6 @@ function App() {
         message={jobMessage} setMessage={setJobMessage}
         selectedJob={selectedJob} setSelectedJob={setSelectedJob}
         selectedResumeJob={selectedResumeJob} setSelectedResumeJob={setSelectedResumeJob}
-        onSaveResume={handleSaveResume}
       />
     );
     if (page === "tracker") return <ApplicationTracker isDark={isDark} />;
@@ -187,14 +162,10 @@ function App() {
 
       <div style={{ position: 'relative', zIndex: 1, maxWidth: '880px', margin: '0 auto', padding: '48px 24px' }}>
 
-        {/* Top row: theme toggle + user info + logout */}
+        {/* Top row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-
-          {/* User info + logout */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '12px', color: t.muted }}>
-              {user?.email}
-            </span>
+            <span style={{ fontSize: '12px', color: t.muted }}>{user?.email}</span>
             <button
               onClick={handleLogout}
               style={{
@@ -211,7 +182,6 @@ function App() {
             </button>
           </div>
 
-          {/* Theme toggle */}
           <button
             onClick={() => setIsDark(p => !p)}
             title={`Switch to ${isDark ? 'light' : 'dark'} mode`}

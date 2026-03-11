@@ -53,6 +53,7 @@ app.post('/auth/logout', requireAuth, async (req, res) => {
 
 app.post('/profile', requireAuth, async (req, res) => {
   const {
+    slot = 1,
     fullName, email, phone, location,
     linkedin, portfolio, skills, languages,
     certifications, summary, experience,
@@ -63,18 +64,18 @@ app.post('/profile', requireAuth, async (req, res) => {
 
   await pool.query(`
     INSERT INTO profile (
-      user_id, "fullName", email, phone, location,
+      user_id, slot, "fullName", email, phone, location,
       linkedin, portfolio, skills, languages,
       certifications, summary, experience,
       education, projects, awards
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-    ON CONFLICT (user_id) DO UPDATE SET
-      "fullName"=$2, email=$3, phone=$4, location=$5,
-      linkedin=$6, portfolio=$7, skills=$8, languages=$9,
-      certifications=$10, summary=$11, experience=$12,
-      education=$13, projects=$14, awards=$15
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+    ON CONFLICT (user_id, slot) DO UPDATE SET
+      "fullName"=$3, email=$4, phone=$5, location=$6,
+      linkedin=$7, portfolio=$8, skills=$9, languages=$10,
+      certifications=$11, summary=$12, experience=$13,
+      education=$14, projects=$15, awards=$16
   `, [
-    userId, fullName, email, phone, location,
+    userId, slot, fullName, email, phone, location,
     linkedin, portfolio, skills, languages,
     certifications, summary, experience,
     education, projects, awards
@@ -85,10 +86,12 @@ app.post('/profile', requireAuth, async (req, res) => {
 
 app.get('/profile', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT * FROM profile WHERE user_id = $1 LIMIT 1`,
+    `SELECT * FROM profile WHERE user_id = $1 ORDER BY slot ASC`,
     [req.user.id]
   );
-  res.json(rows[0] || {});
+  const slots = {};
+  rows.forEach(row => { slots[row.slot] = row; });
+  res.json(slots);
 });
 
 // ─── Resume Upload ───────────────────────────────────────────────────────────
@@ -113,6 +116,34 @@ app.get('/resume/file', requireAuth, (req, res) => {
 app.get('/resume', requireAuth, (req, res) => {
   const filePath = path.join(__dirname, 'uploads', `resume_${req.user.id}.pdf`);
   res.json({ exists: fs.existsSync(filePath) });
+});
+
+// ─── Saved Resumes ───────────────────────────────────────────────────────────
+
+app.post('/saved-resumes', requireAuth, async (req, res) => {
+  const { jobTitle, companyName, content } = req.body;
+  const { rows } = await pool.query(
+    `INSERT INTO saved_resumes (user_id, "jobTitle", "companyName", content)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [req.user.id, jobTitle, companyName, content]
+  );
+  res.json(rows[0]);
+});
+
+app.get('/saved-resumes', requireAuth, async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT * FROM saved_resumes WHERE user_id = $1 ORDER BY "createdAt" DESC`,
+    [req.user.id]
+  );
+  res.json(rows);
+});
+
+app.delete('/saved-resumes/:id', requireAuth, async (req, res) => {
+  await pool.query(
+    `DELETE FROM saved_resumes WHERE id = $1 AND user_id = $2`,
+    [req.params.id, req.user.id]
+  );
+  res.json({ message: 'Deleted' });
 });
 
 // ─── Jobs ────────────────────────────────────────────────────────────────────

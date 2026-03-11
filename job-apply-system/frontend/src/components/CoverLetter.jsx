@@ -113,14 +113,14 @@ function CoverLetter({ jobTitle, companyName, isDark }) {
       // ── Candidate name: pull from letter first line if it starts with a name,
       //    otherwise leave blank — the letter body will carry the identity
       // ── Header: Job Title centered as the document title ──
-      doc.setFont('EBGaramond', 'bold');
+     doc.setFont('helvetica', 'bold');
       doc.setFontSize(22);
       doc.setTextColor(...ACCENT);
       doc.text(sanitizeText(jobTitle), pageW / 2, y, { align: 'center' });
       y += 7;
 
       // Subtitle: company name
-      doc.setFont('EBGaramond', 'italic');
+     doc.setFont('helvetica', 'italic');
       doc.setFontSize(11);
       doc.setTextColor(...GRAY);
       doc.text(`Cover Letter  —  ${sanitizeText(companyName)}`, pageW / 2, y, { align: 'center' });
@@ -136,7 +136,7 @@ function CoverLetter({ jobTitle, companyName, isDark }) {
       // Left accent bar
       doc.setFillColor(...ACCENT);
       doc.rect(ml, y - 4, 2.5, 5.5, 'F');
-      doc.setFont('EBGaramond', 'bold');
+     doc.setFont('helvetica', 'bold');
       doc.setFontSize(10.5);
       doc.setTextColor(...ACCENT);
       doc.text('COVER LETTER', ml + 5, y);
@@ -148,7 +148,7 @@ function CoverLetter({ jobTitle, companyName, isDark }) {
       y += 7;
 
       // ── Body paragraphs ──
-      doc.setFont('EBGaramond', 'normal');
+     doc.setFont('helvetica', 'normal');
       doc.setFontSize(10.5);
       doc.setTextColor(...BLACK);
 
