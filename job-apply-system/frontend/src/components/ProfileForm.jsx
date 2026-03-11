@@ -25,7 +25,7 @@ function ProfileForm({ isDark, form, setForm, message, setMessage }) {
       setLoadingSlots(true);
       try {
         const { data } = await axios.get(`${BASE}/profile`);
-        setSlots({ 1: data[1] || null, 2: data[2] || null, 3: data[3] || null });
+        setSlots({ 1: data["1"] || null, 2: data["2"] || null, 3: data["3"] || null });
         // Auto-load slot 1 if it exists
         if (data[1]) setForm(cleanForm(data[1]));
       } catch {
