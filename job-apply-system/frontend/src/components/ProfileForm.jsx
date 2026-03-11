@@ -1,6 +1,37 @@
+import { useState, useEffect } from "react";
 import axios from "axios";
 
+const EMPTY_FORM = {
+  fullName: "", email: "", phone: "", location: "",
+  linkedin: "", portfolio: "", skills: "", languages: "",
+  certifications: "", summary: "", experience: "",
+  education: "", projects: "", awards: "",
+};
+
+const SLOT_KEYS = ["Profile 1", "Profile 2", "Profile 3"];
+
 function ProfileForm({ isDark, form, setForm, message, setMessage }) {
+  const [activeSlot, setActiveSlot] = useState(0);
+  const [slots, setSlots] = useState(() => {
+    try {
+      const saved = localStorage.getItem("jas_profile_slots");
+      return saved ? JSON.parse(saved) : [null, null, null];
+    } catch { return [null, null, null]; }
+  });
+  const [slotMsg, setSlotMsg] = useState("");
+
+  // Load slot into form when switching
+  function handleSelectSlot(i) {
+    setActiveSlot(i);
+    if (slots[i]) {
+      setForm(slots[i]);
+      setSlotMsg(`Loaded ${SLOT_KEYS[i]}`);
+    } else {
+      setForm({ ...EMPTY_FORM });
+      setSlotMsg(`${SLOT_KEYS[i]} is empty`);
+    }
+    setTimeout(() => setSlotMsg(""), 2000);
+  }
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -10,11 +41,19 @@ function ProfileForm({ isDark, form, setForm, message, setMessage }) {
     e.preventDefault();
     try {
       const response = await axios.post("https://job-apply-system-backend-7i1m.onrender.com/profile", form);
-      setMessage(response.data.message);
+      // Save to slot in localStorage
+      const newSlots = [...slots];
+      newSlots[activeSlot] = { ...form };
+      setSlots(newSlots);
+      localStorage.setItem("jas_profile_slots", JSON.stringify(newSlots));
+      setMessage(response.data.message || "Profile saved!");
     } catch {
       setMessage("Something went wrong. Is the backend running?");
     }
   }
+
+  const accent  = isDark ? '#00b4d8' : '#0077b6';
+  const muted   = isDark ? '#4a7fa5' : '#4a7a9b';
 
   const inputStyle = {
     width: '100%',
@@ -32,15 +71,13 @@ function ProfileForm({ isDark, form, setForm, message, setMessage }) {
   const labelStyle = {
     display: 'block',
     fontSize: '11px',
-    color: isDark ? '#4a7fa5' : '#4a7a9b',
+    color: muted,
     textTransform: 'uppercase',
     letterSpacing: '1px',
     marginBottom: '6px',
   };
 
   const fieldStyle = { marginBottom: '16px' };
-  const accent = isDark ? '#00b4d8' : '#0077b6';
-  const muted = isDark ? '#4a7fa5' : '#4a7a9b';
 
   const sectionLabel = (text) => (
     <div style={{
@@ -54,9 +91,64 @@ function ProfileForm({ isDark, form, setForm, message, setMessage }) {
 
   return (
     <div>
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: '20px' }}>
         <h2 style={{ margin: '0 0 6px 0', fontSize: '1.3rem', color: accent }}>👤 Your Profile</h2>
         <p style={{ margin: 0, color: muted, fontSize: '13px' }}>This info will be used to generate your cover letters and tailored resumes.</p>
+      </div>
+
+      {/* Profile Slots */}
+      <div style={{
+        display: 'flex', gap: '8px', marginBottom: '20px',
+        padding: '12px 14px',
+        background: isDark ? 'rgba(0,180,216,0.04)' : 'rgba(0,150,200,0.05)',
+        border: `1px solid ${isDark ? 'rgba(0,180,216,0.12)' : 'rgba(0,150,200,0.18)'}`,
+        borderRadius: '12px',
+        alignItems: 'center', flexWrap: 'wrap',
+      }}>
+        <span style={{ fontSize: '12px', color: muted, marginRight: '4px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>
+          Profiles:
+        </span>
+        {SLOT_KEYS.map((label, i) => {
+          const filled = !!slots[i];
+          const isActive = activeSlot === i;
+          return (
+            <button
+              key={i}
+              onClick={() => handleSelectSlot(i)}
+              title={filled ? `Load ${label}` : `${label} (empty)`}
+              style={{
+                padding: '6px 16px',
+                borderRadius: '8px',
+                border: isActive
+                  ? `1.5px solid ${accent}`
+                  : `1px solid ${isDark ? 'rgba(0,180,216,0.2)' : 'rgba(0,150,200,0.25)'}`,
+                background: isActive
+                  ? (isDark ? 'rgba(0,180,216,0.15)' : 'rgba(0,150,200,0.12)')
+                  : 'transparent',
+                color: isActive ? accent : muted,
+                fontWeight: isActive ? 'bold' : 'normal',
+                fontSize: '13px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex', alignItems: 'center', gap: '6px',
+              }}
+            >
+              {label}
+              {filled && (
+                <span style={{
+                  width: '7px', height: '7px', borderRadius: '50%',
+                  background: isActive ? accent : (isDark ? 'rgba(0,180,216,0.5)' : 'rgba(0,150,200,0.5)'),
+                  display: 'inline-block',
+                }} />
+              )}
+            </button>
+          );
+        })}
+        {slotMsg && (
+          <span style={{ fontSize: '12px', color: accent, marginLeft: '8px', fontStyle: 'italic' }}>
+            {slotMsg}
+          </span>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
@@ -173,27 +265,29 @@ function ProfileForm({ isDark, form, setForm, message, setMessage }) {
         <div>
           <p style={{ margin: '0 0 4px 0', color: accent, fontSize: '13px', fontWeight: 'bold' }}>Pro Tip</p>
           <p style={{ margin: 0, color: muted, fontSize: '12px' }}>
-            The more detail you add, the better your AI-generated cover letters and resumes will be.
-            Fill in Projects and Achievements — these make your resume stand out.
+            Use multiple profiles for different job types — e.g. one for frontend roles, one for full-stack.
+            Click a profile slot to load it, fill in your details, then hit Save Profile.
           </p>
         </div>
       </div>
 
-      <button
-        onClick={handleSubmit}
-        style={{
-          padding: '12px 32px',
-          background: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
-          color: '#050d1a', border: 'none', borderRadius: '8px',
-          cursor: 'pointer', fontWeight: 'bold', fontSize: '14px',
-          boxShadow: '0 0 20px rgba(0,180,216,0.3)',
-        }}
-      >
-        Save Profile
-      </button>
-      {message && (
-        <span style={{ marginLeft: '16px', color: isDark ? '#00f5d4' : '#007a8a', fontSize: '14px' }}>✅ {message}</span>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+        <button
+          onClick={handleSubmit}
+          style={{
+            padding: '12px 32px',
+            background: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
+            color: '#050d1a', border: 'none', borderRadius: '8px',
+            cursor: 'pointer', fontWeight: 'bold', fontSize: '14px',
+            boxShadow: '0 0 20px rgba(0,180,216,0.3)',
+          }}
+        >
+          Save Profile ({SLOT_KEYS[activeSlot]})
+        </button>
+        {message && (
+          <span style={{ color: isDark ? '#00f5d4' : '#007a8a', fontSize: '14px' }}>✅ {message}</span>
+        )}
+      </div>
     </div>
   );
 }
