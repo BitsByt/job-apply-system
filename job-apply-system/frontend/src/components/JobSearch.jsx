@@ -4,6 +4,7 @@ import CoverLetter from "./CoverLetter";
 import ResumeGenerator from "./ResumeGenerator";
 
 const FILTERS = ["Full-time", "Part-time", "Remote", "Fresh Grad", "Internship"];
+const JOBS_PER_PAGE = 10;
 
 function JobSearch({
   isDark,
@@ -19,6 +20,7 @@ function JobSearch({
 }) {
   const [loading, setLoading] = useState(false);
   const [source, setSource] = useState("Global (JSearch)");
+  const [page, setPage] = useState(1);
 
   const textPrimary = isDark ? '#caf0f8' : '#0d2035';
   const textMuted   = isDark ? '#4a7fa5' : '#4a7a9b';
@@ -35,31 +37,29 @@ function JobSearch({
     transition: 'background 0.3s, color 0.3s',
   };
 
+  const token = localStorage.getItem('jas_token');
+  const authHeader = { Authorization: `Bearer ${token}` };
+
   async function handleSearch() {
     if (!title) return setMessage("Please enter a job title.");
     if (source === 'Global (JSearch)' && !location) return setMessage("Please enter a location.");
     setLoading(true);
     setMessage("");
     setSearched(true);
+    setPage(1);
 
     try {
       let response;
       if (source === 'Cavite Jobs') {
         response = await axios.get(
           "https://job-apply-system-backend-7i1m.onrender.com/cavitejobs",
-          {
-            params: { keyword: title },
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-          }
+          { params: { keyword: title }, headers: authHeader }
         );
       } else {
         const query = activeFilters.length > 0 ? `${title} ${activeFilters.join(' ')}` : title;
         response = await axios.get(
           "https://job-apply-system-backend-7i1m.onrender.com/jobs",
-          {
-            params: { title: query, location },
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-          }
+          { params: { title: query, location }, headers: authHeader }
         );
       }
       setJobs(response.data);
@@ -75,7 +75,7 @@ function JobSearch({
       await axios.post(
         "https://job-apply-system-backend-7i1m.onrender.com/applications",
         { jobTitle: job.job_title, companyName: job.employer_name, jobLink: job.job_apply_link },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+        { headers: authHeader }
       );
       alert("Application saved to tracker!");
     } catch {
@@ -93,6 +93,9 @@ function JobSearch({
     setSelectedJob(null);
   }
 
+  const totalPages = Math.ceil(jobs.length / JOBS_PER_PAGE);
+  const paginatedJobs = jobs.slice((page - 1) * JOBS_PER_PAGE, page * JOBS_PER_PAGE);
+
   return (
     <div>
       {/* Header */}
@@ -107,15 +110,13 @@ function JobSearch({
         {['Global (JSearch)', 'Cavite Jobs'].map((s) => (
           <button
             key={s}
-            onClick={() => setSource(s)}
+            onClick={() => { setSource(s); setJobs([]); setSearched(false); setPage(1); }}
             style={{
-              padding: '6px 14px',
-              borderRadius: '20px',
+              padding: '6px 14px', borderRadius: '20px',
               border: `1px solid ${source === s ? '#00f5d4' : 'rgba(0,180,216,0.2)'}`,
               background: source === s ? 'rgba(0,245,212,0.15)' : 'transparent',
               color: source === s ? '#00f5d4' : textMuted,
-              fontSize: '12px',
-              cursor: 'pointer',
+              fontSize: '12px', cursor: 'pointer',
               fontWeight: source === s ? 'bold' : 'normal',
             }}
           >
@@ -184,9 +185,16 @@ function JobSearch({
         </div>
       )}
 
+      {/* Results count */}
+      {jobs.length > 0 && (
+        <p style={{ color: textMuted, fontSize: '12px', marginBottom: '12px' }}>
+          Showing {(page - 1) * JOBS_PER_PAGE + 1}–{Math.min(page * JOBS_PER_PAGE, jobs.length)} of {jobs.length} results
+        </p>
+      )}
+
       {/* Job Cards */}
       <div>
-        {jobs.map((job) => (
+        {paginatedJobs.map((job) => (
           <div key={job.job_id} style={{
             background: cardBg, borderRadius: '12px', padding: '18px',
             marginBottom: '12px', border: `1px solid ${cardBorder}`,
@@ -265,6 +273,41 @@ function JobSearch({
           </div>
         ))}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '20px' }}>
+          <button
+            onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
+            disabled={page === 1}
+            style={{
+              padding: '8px 20px',
+              background: page === 1 ? 'transparent' : 'rgba(0,180,216,0.1)',
+              color: page === 1 ? '#1e3a5f' : '#00b4d8',
+              border: '1px solid rgba(0,180,216,0.2)',
+              borderRadius: '8px', cursor: page === 1 ? 'not-allowed' : 'pointer',
+              fontSize: '13px',
+            }}
+          >← Prev</button>
+
+          <span style={{ color: textMuted, fontSize: '13px' }}>
+            Page {page} of {totalPages}
+          </span>
+
+          <button
+            onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }}
+            disabled={page === totalPages}
+            style={{
+              padding: '8px 20px',
+              background: page === totalPages ? 'transparent' : 'rgba(0,180,216,0.1)',
+              color: page === totalPages ? '#1e3a5f' : '#00b4d8',
+              border: '1px solid rgba(0,180,216,0.2)',
+              borderRadius: '8px', cursor: page === totalPages ? 'not-allowed' : 'pointer',
+              fontSize: '13px',
+            }}
+          >Next →</button>
+        </div>
+      )}
     </div>
   );
 }
