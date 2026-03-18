@@ -3,6 +3,7 @@ import axios from "axios";
 import CoverLetter from "./CoverLetter";
 import ResumeGenerator from "./ResumeGenerator";
 
+
 const FILTERS = ["Full-time", "Part-time", "Remote", "Fresh Grad", "Internship"];
 const JOBS_PER_PAGE = 10;
 
@@ -37,8 +38,8 @@ function JobSearch({
     transition: 'background 0.3s, color 0.3s',
   };
 
-  const token = localStorage.getItem('jas_token');
-  const authHeader = { Authorization: `Bearer ${token}` };
+const token = localStorage.getItem('jas_token') || axios.defaults.headers.common['Authorization']?.replace('Bearer ', '');
+const authHeader = { Authorization: `Bearer ${token}` };
 
   async function handleSearch() {
     if (!title) return setMessage("Please enter a job title.");
