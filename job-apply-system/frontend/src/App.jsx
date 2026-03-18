@@ -1,270 +1,315 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import axios from "axios";
-import ProfileForm from "./components/ProfileForm";
-import ResumeUpload from "./components/ResumeUpload";
-import JobSearch from "./components/JobSearch";
-import ApplicationTracker from "./components/ApplicationTracker";
-import Auth from "./components/Auth";
+import CoverLetter from "./CoverLetter";
+import ResumeGenerator from "./ResumeGenerator";
 
-const darkTheme = {
-  bgGradient: 'radial-gradient(ellipse at top, #0a1f3c 0%, #050d1a 60%)',
-  gridColor: 'rgba(0,180,216,0.03)',
-  card: 'rgba(8,15,31,0.95)',
-  cardBorder: 'rgba(0,180,216,0.15)',
-  cardShadow: '0 0 60px rgba(0,180,216,0.05), 0 0 120px rgba(0,245,212,0.03)',
-  badgeBg: 'rgba(0,180,216,0.08)',
-  badgeBorder: 'rgba(0,180,216,0.2)',
-  primary: '#00b4d8',
-  text: '#caf0f8',
-  muted: '#4a7fa5',
-  navInactive: 'rgba(0,180,216,0.05)',
-  navBorder: 'rgba(0,180,216,0.15)',
-  navGradient: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
-  h1Color: '#00e5ff',
-  toggleTrack: '#1a3a4a',
-  toggleBorder: 'rgba(0,180,216,0.35)',
-  toggleThumb: '#00b4d8',
-  toggleShadow: '0 0 6px rgba(0,180,216,0.6)',
-};
+const FILTERS = ["Full-time", "Part-time", "Remote", "Fresh Grad", "Internship"];
+const JOBS_PER_PAGE = 10;
 
-const lightTheme = {
-  bgGradient: 'radial-gradient(ellipse at top, #d0eaf7 0%, #eef6fb 60%)',
-  gridColor: 'rgba(0,130,180,0.04)',
-  card: 'rgba(255,255,255,0.95)',
-  cardBorder: 'rgba(0,150,200,0.2)',
-  cardShadow: '0 4px 40px rgba(0,130,180,0.08)',
-  badgeBg: 'rgba(0,150,200,0.08)',
-  badgeBorder: 'rgba(0,150,200,0.25)',
-  primary: '#0088aa',
-  text: '#0d2035',
-  muted: '#4a7a9b',
-  navInactive: 'rgba(0,150,200,0.06)',
-  navBorder: 'rgba(0,150,200,0.2)',
-  navGradient: 'linear-gradient(135deg, #0077b6, #00b4d8)',
-  h1Color: '#0077b6',
-  toggleTrack: '#d4eaf7',
-  toggleBorder: 'rgba(245,166,35,0.5)',
-  toggleThumb: '#f5a623',
-  toggleShadow: '0 0 8px rgba(245,166,35,0.7)',
-};
+function JobSearch({
+  isDark,
+  title, setTitle,
+  location, setLocation,
+  activeFilters, setActiveFilters,
+  jobs, setJobs,
+  searched, setSearched,
+  message, setMessage,
+  selectedJob, setSelectedJob,
+  selectedResumeJob, setSelectedResumeJob,
+  onSaveResume,
+}) {
+  const [loading, setLoading] = useState(false);
+  const [source, setSource] = useState("Global (JSearch)");
+  const [page, setPage] = useState(1);
 
-function App() {
-  const [page, setPage] = useState("profile");
-  const [isDark, setIsDark] = useState(true);
-  const t = isDark ? darkTheme : lightTheme;
+  const textPrimary = isDark ? '#caf0f8' : '#0d2035';
+  const textMuted   = isDark ? '#4a7fa5' : '#4a7a9b';
+  const accent      = isDark ? '#00b4d8' : '#0077b6';
+  const cardBg      = isDark ? 'rgba(0,180,216,0.04)' : 'rgba(255,255,255,0.85)';
+  const cardBorder  = isDark ? 'rgba(0,180,216,0.1)'  : 'rgba(0,150,200,0.2)';
+  const emptyHint   = isDark ? '#1e3a5f' : '#6a9ab0';
 
-  // ─── Auth state ───────────────────────────────────────────────────────────
-  const [token, setToken] = useState(() => localStorage.getItem("jas_token") || null);
-  const [user, setUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("jas_user")) || null; }
-    catch { return null; }
-  });
+  const inputStyle = {
+    padding: '11px 14px', borderRadius: '8px',
+    border: isDark ? '1px solid rgba(0,180,216,0.15)' : '1px solid rgba(0,150,200,0.25)',
+    background: isDark ? 'rgba(0,180,216,0.05)' : 'rgba(255,255,255,0.9)',
+    color: textPrimary, fontSize: '14px', flex: 1, outline: 'none',
+    transition: 'background 0.3s, color 0.3s',
+  };
 
-  useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    } else {
-      delete axios.defaults.headers.common["Authorization"];
-    }
-  }, [token]);
+  const token = localStorage.getItem('jas_token');
+  const authHeader = { Authorization: `Bearer ${token}` };
 
-  function handleLogin(newToken, newUser) {
-    setToken(newToken);
-    setUser(newUser);
-    localStorage.setItem("jas_token", newToken);
-    localStorage.setItem("jas_user", JSON.stringify(newUser));
-    axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
-  }
+  async function handleSearch() {
+    if (!title) return setMessage("Please enter a job title.");
+    if (source === 'Global (JSearch)' && !location) return setMessage("Please enter a location.");
+    setLoading(true);
+    setMessage("");
+    setSearched(true);
+    setPage(1);
 
-  async function handleLogout() {
     try {
-      await axios.post("https://job-apply-system-backend-7i1m.onrender.com/auth/logout");
-    } catch (_) {}
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem("jas_token");
-    localStorage.removeItem("jas_user");
-    delete axios.defaults.headers.common["Authorization"];
-    setProfileForm({
-      fullName: "", email: "", phone: "", location: "",
-      linkedin: "", portfolio: "", skills: "", languages: "",
-      certifications: "", summary: "", experience: "",
-      education: "", projects: "", awards: "",
-    });
-    setJobs([]);
-    setPage("profile");
+      let response;
+      if (source === 'Cavite Jobs') {
+        response = await axios.get(
+          "https://job-apply-system-backend-7i1m.onrender.com/cavitejobs",
+          { params: { keyword: title }, headers: authHeader }
+        );
+      } else {
+        const query = activeFilters.length > 0 ? `${title} ${activeFilters.join(' ')}` : title;
+        response = await axios.get(
+          "https://job-apply-system-backend-7i1m.onrender.com/jobs",
+          { params: { title: query, location }, headers: authHeader }
+        );
+      }
+      setJobs(response.data);
+      if (response.data.length === 0) setMessage("No jobs found. Try a different search.");
+    } catch {
+      setMessage("Search failed. Is the backend running?");
+    }
+    setLoading(false);
   }
 
-  // ─── Profile state ────────────────────────────────────────────────────────
-  const [profileForm, setProfileForm] = useState({
-    fullName: "", email: "", phone: "", location: "",
-    linkedin: "", portfolio: "", skills: "", languages: "",
-    certifications: "", summary: "", experience: "",
-    education: "", projects: "", awards: "",
-  });
-  const [profileMessage, setProfileMessage] = useState("");
-
-  // ─── Job search state ─────────────────────────────────────────────────────
-  const [jobTitle, setJobTitle] = useState("");
-  const [jobLocation, setJobLocation] = useState("");
-  const [activeFilters, setActiveFilters] = useState([]);
-  const [jobs, setJobs] = useState([]);
-  const [jobSearched, setJobSearched] = useState(false);
-  const [jobMessage, setJobMessage] = useState("");
-  const [selectedJob, setSelectedJob] = useState(null);
-  const [selectedResumeJob, setSelectedResumeJob] = useState(null);
-
-  // ─── Show auth screen if not logged in ───────────────────────────────────
-  if (!token) {
-    return <Auth onLogin={handleLogin} isDark={isDark} />;
+  async function handleApply(job) {
+    try {
+      await axios.post(
+        "https://job-apply-system-backend-7i1m.onrender.com/applications",
+        { jobTitle: job.job_title, companyName: job.employer_name, jobLink: job.job_apply_link },
+        { headers: authHeader }
+      );
+      alert("Application saved to tracker!");
+    } catch {
+      alert("Failed to save application.");
+    }
   }
 
-  function renderPage() {
-    if (page === "profile") return (
-      <ProfileForm
-        isDark={isDark}
-        form={profileForm} setForm={setProfileForm}
-        message={profileMessage} setMessage={setProfileMessage}
-      />
-    );
-    if (page === "resume") return (
-      <ResumeUpload isDark={isDark} />
-    );
-    if (page === "jobs") return (
-      <JobSearch
-        isDark={isDark}
-        title={jobTitle} setTitle={setJobTitle}
-        location={jobLocation} setLocation={setJobLocation}
-        activeFilters={activeFilters} setActiveFilters={setActiveFilters}
-        jobs={jobs} setJobs={setJobs}
-        searched={jobSearched} setSearched={setJobSearched}
-        message={jobMessage} setMessage={setJobMessage}
-        selectedJob={selectedJob} setSelectedJob={setSelectedJob}
-        selectedResumeJob={selectedResumeJob} setSelectedResumeJob={setSelectedResumeJob}
-      />
-    );
-    if (page === "tracker") return <ApplicationTracker isDark={isDark} />;
+  function toggleCoverLetter(job) {
+    setSelectedJob(selectedJob?.job_id === job.job_id ? null : job);
+    setSelectedResumeJob(null);
   }
+
+  function toggleResume(job) {
+    setSelectedResumeJob(selectedResumeJob?.job_id === job.job_id ? null : job);
+    setSelectedJob(null);
+  }
+
+  const totalPages = Math.ceil(jobs.length / JOBS_PER_PAGE);
+  const paginatedJobs = jobs.slice((page - 1) * JOBS_PER_PAGE, page * JOBS_PER_PAGE);
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundImage: t.bgGradient,
-      color: t.text,
-      fontFamily: "'Segoe UI', sans-serif",
-      transition: 'background 0.3s, color 0.3s',
-    }}>
-      <div style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundImage: `linear-gradient(${t.gridColor} 1px, transparent 1px), linear-gradient(90deg, ${t.gridColor} 1px, transparent 1px)`,
-        backgroundSize: '40px 40px', pointerEvents: 'none', zIndex: 0,
-      }} />
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ margin: '0 0 6px 0', fontSize: '1.3rem', color: accent }}>🔍 Search Jobs</h2>
+        <p style={{ margin: 0, color: textMuted, fontSize: '13px' }}>Search across thousands of live job listings.</p>
+      </div>
 
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: '880px', margin: '0 auto', padding: '48px 24px' }}>
+      {/* Source Toggle */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', alignItems: 'center' }}>
+        <span style={{ color: textMuted, fontSize: '12px' }}>Source:</span>
+        {['Global (JSearch)', 'Cavite Jobs'].map((s) => (
+          <button
+            key={s}
+            onClick={() => { setSource(s); setJobs([]); setSearched(false); setPage(1); }}
+            style={{
+              padding: '6px 14px', borderRadius: '20px',
+              border: `1px solid ${source === s ? '#00f5d4' : 'rgba(0,180,216,0.2)'}`,
+              background: source === s ? 'rgba(0,245,212,0.15)' : 'transparent',
+              color: source === s ? '#00f5d4' : textMuted,
+              fontSize: '12px', cursor: 'pointer',
+              fontWeight: source === s ? 'bold' : 'normal',
+            }}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
 
-        {/* Top row */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '12px', color: t.muted }}>{user?.email}</span>
-            <button
-              onClick={handleLogout}
-              style={{
-                padding: '5px 14px',
-                background: 'rgba(248,113,113,0.1)',
-                color: '#f87171',
-                border: '1px solid rgba(248,113,113,0.25)',
-                borderRadius: '8px', cursor: 'pointer',
-                fontSize: '12px', fontWeight: 'bold',
-                transition: 'all 0.2s',
-              }}
-            >
-              Sign Out
-            </button>
+      {/* Search Bar */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+        <input
+          style={inputStyle}
+          placeholder="Job Title (e.g. Web Developer)"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+        />
+        {source === 'Global (JSearch)' && (
+          <input
+            style={{ ...inputStyle, flex: '0 0 200px' }}
+            placeholder="Location (e.g. Manila)"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          />
+        )}
+        <button onClick={handleSearch} style={{
+          padding: '11px 28px',
+          background: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
+          color: '#050d1a', border: 'none', borderRadius: '8px',
+          cursor: 'pointer', fontWeight: 'bold', fontSize: '14px',
+          boxShadow: '0 0 20px rgba(0,180,216,0.3)',
+        }}>
+          {loading ? "Searching..." : "Search"}
+        </button>
+      </div>
+
+      {/* Filter Chips */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
+        {FILTERS.map((f) => (
+          <button key={f}
+            onClick={() => setActiveFilters(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f])}
+            style={{
+              padding: '6px 14px', borderRadius: '20px',
+              border: `1px solid ${activeFilters.includes(f) ? accent : cardBorder}`,
+              background: activeFilters.includes(f)
+                ? (isDark ? 'rgba(0,180,216,0.15)' : 'rgba(0,150,200,0.1)')
+                : 'transparent',
+              color: activeFilters.includes(f) ? accent : textMuted,
+              fontSize: '12px', cursor: 'pointer',
+              fontWeight: activeFilters.includes(f) ? 'bold' : 'normal',
+              transition: 'all 0.2s',
+            }}
+          >{f}</button>
+        ))}
+      </div>
+
+      {message && <p style={{ color: textMuted, marginBottom: '16px' }}>{message}</p>}
+
+      {/* Empty State */}
+      {!searched && jobs.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
+          <p style={{ color: textMuted, fontSize: '14px', margin: '0 0 8px 0' }}>Enter a job title to find listings</p>
+          <p style={{ color: emptyHint, fontSize: '12px', margin: 0 }}>Results are pulled live from job boards across the web</p>
+        </div>
+      )}
+
+      {/* Results count */}
+      {jobs.length > 0 && (
+        <p style={{ color: textMuted, fontSize: '12px', marginBottom: '12px' }}>
+          Showing {(page - 1) * JOBS_PER_PAGE + 1}–{Math.min(page * JOBS_PER_PAGE, jobs.length)} of {jobs.length} results
+        </p>
+      )}
+
+      {/* Job Cards */}
+      <div>
+        {paginatedJobs.map((job) => (
+          <div key={job.job_id} style={{
+            background: cardBg, borderRadius: '12px', padding: '18px',
+            marginBottom: '12px', border: `1px solid ${cardBorder}`,
+            transition: 'background 0.3s',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', color: textPrimary }}>{job.job_title}</h3>
+                <p style={{ margin: '0 0 4px 0', color: accent, fontSize: '13px' }}>{job.employer_name}</p>
+                <p style={{ margin: 0, color: textMuted, fontSize: '12px' }}>
+                  📍 {job.job_city || 'Remote'}, {job.job_country}
+                  {job.salary && <span style={{ marginLeft: '10px', color: '#00f5d4' }}>💰 {job.salary}</span>}
+                </p>
+              </div>
+              <span style={{
+                padding: '4px 12px', borderRadius: '20px', fontSize: '11px',
+                background: isDark ? 'rgba(0,180,216,0.1)' : 'rgba(0,150,200,0.1)',
+                color: accent, border: `1px solid ${cardBorder}`, whiteSpace: 'nowrap',
+              }}>
+                {job.job_employment_type || 'Full-time'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <a href={job.job_apply_link} target="_blank" rel="noreferrer" style={{
+                padding: '7px 16px',
+                background: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
+                color: '#050d1a', borderRadius: '6px',
+                textDecoration: 'none', fontSize: '12px', fontWeight: 'bold',
+              }}>Apply Here ↗</a>
+
+              <button onClick={() => toggleCoverLetter(job)} style={{
+                padding: '7px 16px',
+                background: selectedJob?.job_id === job.job_id
+                  ? (isDark ? 'rgba(0,180,216,0.2)' : 'rgba(0,150,200,0.2)')
+                  : (isDark ? 'rgba(0,180,216,0.08)' : 'rgba(0,150,200,0.08)'),
+                color: accent, border: `1px solid ${cardBorder}`,
+                borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
+              }}>✍️ Cover Letter</button>
+
+              <button onClick={() => toggleResume(job)} style={{
+                padding: '7px 16px',
+                background: selectedResumeJob?.job_id === job.job_id
+                  ? (isDark ? 'rgba(0,245,212,0.15)' : 'rgba(0,119,182,0.15)')
+                  : (isDark ? 'rgba(0,245,212,0.06)' : 'rgba(0,119,182,0.06)'),
+                color: isDark ? '#00f5d4' : '#0077b6',
+                border: `1px solid ${isDark ? 'rgba(0,245,212,0.2)' : 'rgba(0,119,182,0.2)'}`,
+                borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
+              }}>📄 Resume</button>
+
+              <button onClick={() => handleApply(job)} style={{
+                padding: '7px 16px', background: 'transparent',
+                color: textMuted, border: `1px solid ${cardBorder}`,
+                borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
+              }}>📋 Mark Applied</button>
+            </div>
+
+            {/* Cover Letter inline */}
+            {selectedJob?.job_id === job.job_id && (
+              <div style={{ marginTop: '16px', borderTop: `1px solid ${cardBorder}`, paddingTop: '16px' }}>
+                <CoverLetter jobTitle={job.job_title} companyName={job.employer_name} isDark={isDark} />
+              </div>
+            )}
+
+            {/* Resume Generator inline */}
+            {selectedResumeJob?.job_id === job.job_id && (
+              <div style={{ marginTop: '16px', borderTop: `1px solid ${cardBorder}`, paddingTop: '16px' }}>
+                <ResumeGenerator
+                  jobTitle={job.job_title}
+                  companyName={job.employer_name}
+                  isDark={isDark}
+                  onSave={onSaveResume}
+                />
+              </div>
+            )}
           </div>
+        ))}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '20px' }}>
+          <button
+            onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
+            disabled={page === 1}
+            style={{
+              padding: '8px 20px',
+              background: page === 1 ? 'transparent' : 'rgba(0,180,216,0.1)',
+              color: page === 1 ? '#1e3a5f' : '#00b4d8',
+              border: '1px solid rgba(0,180,216,0.2)',
+              borderRadius: '8px', cursor: page === 1 ? 'not-allowed' : 'pointer',
+              fontSize: '13px',
+            }}
+          >← Prev</button>
+
+          <span style={{ color: textMuted, fontSize: '13px' }}>
+            Page {page} of {totalPages}
+          </span>
 
           <button
-            onClick={() => setIsDark(p => !p)}
-            title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-          >
-            <div style={{
-              position: 'relative', width: '48px', height: '26px',
-              borderRadius: '999px', background: t.toggleTrack,
-              border: `1.5px solid ${t.toggleBorder}`,
-              transition: 'background 0.3s, border-color 0.3s', flexShrink: 0,
-            }}>
-              <div style={{
-                position: 'absolute', top: '2px', left: isDark ? '2px' : '22px',
-                width: '18px', height: '18px', borderRadius: '50%',
-                background: t.toggleThumb, boxShadow: t.toggleShadow,
-                transition: 'left 0.3s cubic-bezier(0.34,1.56,0.64,1), background 0.3s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px',
-              }}>
-                {isDark ? '🌙' : '☀️'}
-              </div>
-            </div>
-            <span style={{ fontSize: '13px', color: t.muted, fontWeight: 500 }}>
-              {isDark ? 'Dark' : 'Light'}
-            </span>
-          </button>
+            onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }}
+            disabled={page === totalPages}
+            style={{
+              padding: '8px 20px',
+              background: page === totalPages ? 'transparent' : 'rgba(0,180,216,0.1)',
+              color: page === totalPages ? '#1e3a5f' : '#00b4d8',
+              border: '1px solid rgba(0,180,216,0.2)',
+              borderRadius: '8px', cursor: page === totalPages ? 'not-allowed' : 'pointer',
+              fontSize: '13px',
+            }}
+          >Next →</button>
         </div>
-
-        {/* Hero */}
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{
-            display: 'inline-block', background: t.badgeBg,
-            border: `1px solid ${t.badgeBorder}`, borderRadius: '100px',
-            padding: '6px 18px', fontSize: '12px', color: t.primary,
-            marginBottom: '16px', letterSpacing: '2px', textTransform: 'uppercase',
-          }}>
-            Your Job Hunt, Automated
-          </div>
-          <h1 style={{ fontSize: '2.8rem', margin: '0 0 10px 0', color: t.h1Color, letterSpacing: '1px', lineHeight: 1.2, transition: 'color 0.3s' }}>
-            Just Apply Smart
-          </h1>
-          <p style={{ color: t.muted, margin: 0, fontSize: '15px' }}>
-            Search jobs · Generate cover letters & resumes · Track applications
-          </p>
-        </div>
-
-        {/* Nav */}
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '32px', flexWrap: 'wrap' }}>
-          {[
-            { key: 'profile', label: '👤 Profile' },
-            { key: 'resume', label: '📄 Resume' },
-            { key: 'jobs', label: '🔍 Jobs' },
-            { key: 'tracker', label: '📋 Tracker' },
-          ].map((p) => (
-            <button key={p.key} onClick={() => setPage(p.key)} style={{
-              padding: '10px 24px', cursor: 'pointer',
-              background: page === p.key ? t.navGradient : t.navInactive,
-              color: page === p.key ? '#fff' : t.muted,
-              border: `1px solid ${page === p.key ? 'transparent' : t.navBorder}`,
-              borderRadius: '10px', fontWeight: 'bold', fontSize: '14px',
-              boxShadow: page === p.key ? '0 0 20px rgba(0,180,216,0.3)' : 'none',
-              transition: 'all 0.2s',
-            }}>
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Card */}
-        <div style={{
-          background: t.card, borderRadius: '20px', padding: '32px',
-          border: `1px solid ${t.cardBorder}`, boxShadow: t.cardShadow,
-          backdropFilter: 'blur(10px)',
-          transition: 'background 0.3s, border-color 0.3s, box-shadow 0.3s',
-        }}>
-          {renderPage()}
-        </div>
-
-        <p style={{ textAlign: 'center', marginTop: '24px', color: t.muted, fontSize: '12px' }}>
-          Built with React + Node.js · Powered by Groq AI · Built by Elijah Ethanli D. Escondo
-        </p>
-      </div>
+      )}
     </div>
   );
 }
 
-export default App;
+export default JobSearch;
