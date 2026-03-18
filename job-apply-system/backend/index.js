@@ -358,6 +358,50 @@ app.delete('/applications/:id', requireAuth, async (req, res) => {
   res.json({ message: 'Application deleted!' });
 });
 
+
+// CaviteJobs scraper
+app.get('/cavitejobs', requireAuth, async (req, res) => {
+  const { keyword } = req.query;
+  try {
+    const response = await fetch(
+      `https://www.cavitejobs.net/?view=recommendedjobs&format=nothtml&ajax=linefeed&feed_num=1&keyword=${encodeURIComponent(keyword)}&joblocation=&jobsite=www.cavitejobs.net&title=&company=&salary=&posted=&empId=&contactemail=&referral=`
+    );
+    const html = await response.text();
+    const cheerio = require('cheerio');
+    const $ = cheerio.load(html);
+    const jobs = [];
+
+    $('tr[job_id]').each((i, el) => {
+      const jobId = $(el).attr('job_id');
+      const title = $(el).find('a').first().text().trim();
+      const company = $(el).find('td').eq(1).text().trim();
+      const location = $(el).find('td').eq(2).text().trim();
+      const posted = $(el).find('td').eq(3).text().trim().split('\n')[0].trim();
+      const salary = $(el).find('.hasTooltip').first().text().trim();
+
+      if (title) {
+        jobs.push({
+          job_id: `cavite_${jobId}`,
+          job_title: title,
+          employer_name: company,
+          job_city: location,
+          job_country: 'PH',
+          job_employment_type: 'Full-time',
+          job_apply_link: `https://www.cavitejobs.net/job-opening/?jobid=${jobId}`,
+          salary: salary || null,
+          posted: posted,
+          source: 'cavitejobs.net'
+        });
+      }
+    });
+
+    res.json(jobs);
+  } catch (err) {
+    console.error('CaviteJobs error:', err.message);
+    res.status(500).json({ message: 'CaviteJobs scraping failed' });
+  }
+});
+
 // ─── Server ──────────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3000;
