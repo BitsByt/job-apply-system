@@ -18,6 +18,7 @@ function JobSearch({
   onSaveResume,
 }) {
   const [loading, setLoading] = useState(false);
+  const [source, setSource] = useState("Global (JSearch)");
 
   const textPrimary = isDark ? '#caf0f8' : '#0d2035';
   const textMuted   = isDark ? '#4a7fa5' : '#4a7a9b';
@@ -35,11 +36,32 @@ function JobSearch({
   };
 
   async function handleSearch() {
-    if (!title || !location) return setMessage("Please enter a job title and location.");
-    setLoading(true); setMessage(""); setSearched(true);
-    const query = activeFilters.length > 0 ? `${title} ${activeFilters.join(' ')}` : title;
+    if (!title) return setMessage("Please enter a job title.");
+    if (source === 'Global (JSearch)' && !location) return setMessage("Please enter a location.");
+    setLoading(true);
+    setMessage("");
+    setSearched(true);
+
     try {
-      const response = await axios.get("https://job-apply-system-backend-7i1m.onrender.com/jobs", { params: { title: query, location } });
+      let response;
+      if (source === 'Cavite Jobs') {
+        response = await axios.get(
+          "https://job-apply-system-backend-7i1m.onrender.com/cavitejobs",
+          {
+            params: { keyword: title },
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          }
+        );
+      } else {
+        const query = activeFilters.length > 0 ? `${title} ${activeFilters.join(' ')}` : title;
+        response = await axios.get(
+          "https://job-apply-system-backend-7i1m.onrender.com/jobs",
+          {
+            params: { title: query, location },
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          }
+        );
+      }
       setJobs(response.data);
       if (response.data.length === 0) setMessage("No jobs found. Try a different search.");
     } catch {
@@ -50,11 +72,15 @@ function JobSearch({
 
   async function handleApply(job) {
     try {
-      await axios.post("https://job-apply-system-backend-7i1m.onrender.com/applications", {
-        jobTitle: job.job_title, companyName: job.employer_name, jobLink: job.job_apply_link
-      });
+      await axios.post(
+        "https://job-apply-system-backend-7i1m.onrender.com/applications",
+        { jobTitle: job.job_title, companyName: job.employer_name, jobLink: job.job_apply_link },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
       alert("Application saved to tracker!");
-    } catch { alert("Failed to save application."); }
+    } catch {
+      alert("Failed to save application.");
+    }
   }
 
   function toggleCoverLetter(job) {
@@ -69,18 +95,56 @@ function JobSearch({
 
   return (
     <div>
+      {/* Header */}
       <div style={{ marginBottom: '20px' }}>
         <h2 style={{ margin: '0 0 6px 0', fontSize: '1.3rem', color: accent }}>🔍 Search Jobs</h2>
         <p style={{ margin: 0, color: textMuted, fontSize: '13px' }}>Search across thousands of live job listings.</p>
       </div>
 
+      {/* Source Toggle */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', alignItems: 'center' }}>
+        <span style={{ color: textMuted, fontSize: '12px' }}>Source:</span>
+        {['Global (JSearch)', 'Cavite Jobs'].map((s) => (
+          <button
+            key={s}
+            onClick={() => setSource(s)}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '20px',
+              border: `1px solid ${source === s ? '#00f5d4' : 'rgba(0,180,216,0.2)'}`,
+              background: source === s ? 'rgba(0,245,212,0.15)' : 'transparent',
+              color: source === s ? '#00f5d4' : textMuted,
+              fontSize: '12px',
+              cursor: 'pointer',
+              fontWeight: source === s ? 'bold' : 'normal',
+            }}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      {/* Search Bar */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
-        <input style={inputStyle} placeholder="Job Title (e.g. Web Developer)" value={title}
-          onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
-        <input style={{ ...inputStyle, flex: '0 0 200px' }} placeholder="Location (e.g. Manila)" value={location}
-          onChange={(e) => setLocation(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
+        <input
+          style={inputStyle}
+          placeholder="Job Title (e.g. Web Developer)"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+        />
+        {source === 'Global (JSearch)' && (
+          <input
+            style={{ ...inputStyle, flex: '0 0 200px' }}
+            placeholder="Location (e.g. Manila)"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          />
+        )}
         <button onClick={handleSearch} style={{
-          padding: '11px 28px', background: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
+          padding: '11px 28px',
+          background: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
           color: '#050d1a', border: 'none', borderRadius: '8px',
           cursor: 'pointer', fontWeight: 'bold', fontSize: '14px',
           boxShadow: '0 0 20px rgba(0,180,216,0.3)',
@@ -89,6 +153,7 @@ function JobSearch({
         </button>
       </div>
 
+      {/* Filter Chips */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
         {FILTERS.map((f) => (
           <button key={f}
@@ -96,36 +161,45 @@ function JobSearch({
             style={{
               padding: '6px 14px', borderRadius: '20px',
               border: `1px solid ${activeFilters.includes(f) ? accent : cardBorder}`,
-              background: activeFilters.includes(f) ? (isDark ? 'rgba(0,180,216,0.15)' : 'rgba(0,150,200,0.1)') : 'transparent',
+              background: activeFilters.includes(f)
+                ? (isDark ? 'rgba(0,180,216,0.15)' : 'rgba(0,150,200,0.1)')
+                : 'transparent',
               color: activeFilters.includes(f) ? accent : textMuted,
               fontSize: '12px', cursor: 'pointer',
               fontWeight: activeFilters.includes(f) ? 'bold' : 'normal',
               transition: 'all 0.2s',
-            }}>{f}</button>
+            }}
+          >{f}</button>
         ))}
       </div>
 
       {message && <p style={{ color: textMuted, marginBottom: '16px' }}>{message}</p>}
 
+      {/* Empty State */}
       {!searched && jobs.length === 0 && (
         <div style={{ textAlign: 'center', padding: '48px 0' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
-          <p style={{ color: textMuted, fontSize: '14px', margin: '0 0 8px 0' }}>Enter a job title and location to find listings</p>
+          <p style={{ color: textMuted, fontSize: '14px', margin: '0 0 8px 0' }}>Enter a job title to find listings</p>
           <p style={{ color: emptyHint, fontSize: '12px', margin: 0 }}>Results are pulled live from job boards across the web</p>
         </div>
       )}
 
+      {/* Job Cards */}
       <div>
         {jobs.map((job) => (
           <div key={job.job_id} style={{
             background: cardBg, borderRadius: '12px', padding: '18px',
-            marginBottom: '12px', border: `1px solid ${cardBorder}`, transition: 'background 0.3s',
+            marginBottom: '12px', border: `1px solid ${cardBorder}`,
+            transition: 'background 0.3s',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
               <div>
                 <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', color: textPrimary }}>{job.job_title}</h3>
                 <p style={{ margin: '0 0 4px 0', color: accent, fontSize: '13px' }}>{job.employer_name}</p>
-                <p style={{ margin: 0, color: textMuted, fontSize: '12px' }}>📍 {job.job_city || 'Remote'}, {job.job_country}</p>
+                <p style={{ margin: 0, color: textMuted, fontSize: '12px' }}>
+                  📍 {job.job_city || 'Remote'}, {job.job_country}
+                  {job.salary && <span style={{ marginLeft: '10px', color: '#00f5d4' }}>💰 {job.salary}</span>}
+                </p>
               </div>
               <span style={{
                 padding: '4px 12px', borderRadius: '20px', fontSize: '11px',
@@ -138,8 +212,10 @@ function JobSearch({
 
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <a href={job.job_apply_link} target="_blank" rel="noreferrer" style={{
-                padding: '7px 16px', background: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
-                color: '#050d1a', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: 'bold',
+                padding: '7px 16px',
+                background: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
+                color: '#050d1a', borderRadius: '6px',
+                textDecoration: 'none', fontSize: '12px', fontWeight: 'bold',
               }}>Apply Here ↗</a>
 
               <button onClick={() => toggleCoverLetter(job)} style={{
