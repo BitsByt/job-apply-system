@@ -1,11 +1,11 @@
 import { useState } from "react";
 import axios from "axios";
-import CoverLetter from "./components/CoverLetter";
-import ResumeGenerator from "./components/ResumeGenerator";
-
+import CoverLetter from "./CoverLetter";
+import ResumeGenerator from "./ResumeGenerator";
 
 const FILTERS = ["Full-time", "Part-time", "Remote", "Fresh Grad", "Internship"];
 const JOBS_PER_PAGE = 10;
+const BASE = "https://job-apply-system-backend-7i1m.onrender.com";
 
 function JobSearch({
   isDark,
@@ -23,6 +23,9 @@ function JobSearch({
   const [source, setSource] = useState("Global (JSearch)");
   const [page, setPage] = useState(1);
 
+  const safeJobs = jobs || [];
+  const safeFilters = activeFilters || [];
+
   const textPrimary = isDark ? '#caf0f8' : '#0d2035';
   const textMuted   = isDark ? '#4a7fa5' : '#4a7a9b';
   const accent      = isDark ? '#00b4d8' : '#0077b6';
@@ -38,9 +41,6 @@ function JobSearch({
     transition: 'background 0.3s, color 0.3s',
   };
 
-const token = localStorage.getItem('jas_token') || axios.defaults.headers.common['Authorization']?.replace('Bearer ', '');
-const authHeader = { Authorization: `Bearer ${token}` };
-
   async function handleSearch() {
     if (!title) return setMessage("Please enter a job title.");
     if (source === 'Global (JSearch)' && !location) return setMessage("Please enter a location.");
@@ -52,19 +52,13 @@ const authHeader = { Authorization: `Bearer ${token}` };
     try {
       let response;
       if (source === 'Cavite Jobs') {
-        response = await axios.get(
-          "https://job-apply-system-backend-7i1m.onrender.com/cavitejobs",
-          { params: { keyword: title }, headers: authHeader }
-        );
+        response = await axios.get(`${BASE}/cavitejobs`, { params: { keyword: title } });
       } else {
-        const query = activeFilters.length > 0 ? `${title} ${activeFilters.join(' ')}` : title;
-        response = await axios.get(
-          "https://job-apply-system-backend-7i1m.onrender.com/jobs",
-          { params: { title: query, location }, headers: authHeader }
-        );
+        const query = safeFilters.length > 0 ? `${title} ${safeFilters.join(' ')}` : title;
+        response = await axios.get(`${BASE}/jobs`, { params: { title: query, location } });
       }
-      setJobs(response.data);
-      if (response.data.length === 0) setMessage("No jobs found. Try a different search.");
+      setJobs(response.data || []);
+      if (!response.data || response.data.length === 0) setMessage("No jobs found. Try a different search.");
     } catch {
       setMessage("Search failed. Is the backend running?");
     }
@@ -73,11 +67,11 @@ const authHeader = { Authorization: `Bearer ${token}` };
 
   async function handleApply(job) {
     try {
-      await axios.post(
-        "https://job-apply-system-backend-7i1m.onrender.com/applications",
-        { jobTitle: job.job_title, companyName: job.employer_name, jobLink: job.job_apply_link },
-        { headers: authHeader }
-      );
+      await axios.post(`${BASE}/applications`, {
+        jobTitle: job.job_title,
+        companyName: job.employer_name,
+        jobLink: job.job_apply_link
+      });
       alert("Application saved to tracker!");
     } catch {
       alert("Failed to save application.");
@@ -94,12 +88,11 @@ const authHeader = { Authorization: `Bearer ${token}` };
     setSelectedJob(null);
   }
 
-  const totalPages = Math.ceil(jobs.length / JOBS_PER_PAGE);
-  const paginatedJobs = jobs.slice((page - 1) * JOBS_PER_PAGE, page * JOBS_PER_PAGE);
+  const totalPages = Math.ceil(safeJobs.length / JOBS_PER_PAGE);
+  const paginatedJobs = safeJobs.slice((page - 1) * JOBS_PER_PAGE, page * JOBS_PER_PAGE);
 
   return (
     <div>
-      {/* Header */}
       <div style={{ marginBottom: '20px' }}>
         <h2 style={{ margin: '0 0 6px 0', fontSize: '1.3rem', color: accent }}>🔍 Search Jobs</h2>
         <p style={{ margin: 0, color: textMuted, fontSize: '13px' }}>Search across thousands of live job listings.</p>
@@ -109,8 +102,7 @@ const authHeader = { Authorization: `Bearer ${token}` };
       <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', alignItems: 'center' }}>
         <span style={{ color: textMuted, fontSize: '12px' }}>Source:</span>
         {['Global (JSearch)', 'Cavite Jobs'].map((s) => (
-          <button
-            key={s}
+          <button key={s}
             onClick={() => { setSource(s); setJobs([]); setSearched(false); setPage(1); }}
             style={{
               padding: '6px 14px', borderRadius: '20px',
@@ -120,33 +112,20 @@ const authHeader = { Authorization: `Bearer ${token}` };
               fontSize: '12px', cursor: 'pointer',
               fontWeight: source === s ? 'bold' : 'normal',
             }}
-          >
-            {s}
-          </button>
+          >{s}</button>
         ))}
       </div>
 
       {/* Search Bar */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
-        <input
-          style={inputStyle}
-          placeholder="Job Title (e.g. Web Developer)"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-        />
+        <input style={inputStyle} placeholder="Job Title (e.g. Web Developer)" value={title}
+          onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
         {source === 'Global (JSearch)' && (
-          <input
-            style={{ ...inputStyle, flex: '0 0 200px' }}
-            placeholder="Location (e.g. Manila)"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          />
+          <input style={{ ...inputStyle, flex: '0 0 200px' }} placeholder="Location (e.g. Manila)" value={location}
+            onChange={(e) => setLocation(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
         )}
         <button onClick={handleSearch} style={{
-          padding: '11px 28px',
-          background: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
+          padding: '11px 28px', background: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
           color: '#050d1a', border: 'none', borderRadius: '8px',
           cursor: 'pointer', fontWeight: 'bold', fontSize: '14px',
           boxShadow: '0 0 20px rgba(0,180,216,0.3)',
@@ -159,17 +138,14 @@ const authHeader = { Authorization: `Bearer ${token}` };
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
         {FILTERS.map((f) => (
           <button key={f}
-            onClick={() => setActiveFilters(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f])}
+            onClick={() => setActiveFilters(prev => (prev || []).includes(f) ? (prev || []).filter(x => x !== f) : [...(prev || []), f])}
             style={{
               padding: '6px 14px', borderRadius: '20px',
-              border: `1px solid ${activeFilters.includes(f) ? accent : cardBorder}`,
-              background: activeFilters.includes(f)
-                ? (isDark ? 'rgba(0,180,216,0.15)' : 'rgba(0,150,200,0.1)')
-                : 'transparent',
-              color: activeFilters.includes(f) ? accent : textMuted,
+              border: `1px solid ${safeFilters.includes(f) ? accent : cardBorder}`,
+              background: safeFilters.includes(f) ? (isDark ? 'rgba(0,180,216,0.15)' : 'rgba(0,150,200,0.1)') : 'transparent',
+              color: safeFilters.includes(f) ? accent : textMuted,
               fontSize: '12px', cursor: 'pointer',
-              fontWeight: activeFilters.includes(f) ? 'bold' : 'normal',
-              transition: 'all 0.2s',
+              fontWeight: safeFilters.includes(f) ? 'bold' : 'normal',
             }}
           >{f}</button>
         ))}
@@ -178,7 +154,7 @@ const authHeader = { Authorization: `Bearer ${token}` };
       {message && <p style={{ color: textMuted, marginBottom: '16px' }}>{message}</p>}
 
       {/* Empty State */}
-      {!searched && jobs.length === 0 && (
+      {!searched && safeJobs.length === 0 && (
         <div style={{ textAlign: 'center', padding: '48px 0' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
           <p style={{ color: textMuted, fontSize: '14px', margin: '0 0 8px 0' }}>Enter a job title to find listings</p>
@@ -187,9 +163,9 @@ const authHeader = { Authorization: `Bearer ${token}` };
       )}
 
       {/* Results count */}
-      {jobs.length > 0 && (
+      {safeJobs.length > 0 && (
         <p style={{ color: textMuted, fontSize: '12px', marginBottom: '12px' }}>
-          Showing {(page - 1) * JOBS_PER_PAGE + 1}–{Math.min(page * JOBS_PER_PAGE, jobs.length)} of {jobs.length} results
+          Showing {(page - 1) * JOBS_PER_PAGE + 1}–{Math.min(page * JOBS_PER_PAGE, safeJobs.length)} of {safeJobs.length} results
         </p>
       )}
 
@@ -199,7 +175,6 @@ const authHeader = { Authorization: `Bearer ${token}` };
           <div key={job.job_id} style={{
             background: cardBg, borderRadius: '12px', padding: '18px',
             marginBottom: '12px', border: `1px solid ${cardBorder}`,
-            transition: 'background 0.3s',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
               <div>
@@ -221,26 +196,19 @@ const authHeader = { Authorization: `Bearer ${token}` };
 
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <a href={job.job_apply_link} target="_blank" rel="noreferrer" style={{
-                padding: '7px 16px',
-                background: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
-                color: '#050d1a', borderRadius: '6px',
-                textDecoration: 'none', fontSize: '12px', fontWeight: 'bold',
+                padding: '7px 16px', background: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
+                color: '#050d1a', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: 'bold',
               }}>Apply Here ↗</a>
 
               <button onClick={() => toggleCoverLetter(job)} style={{
                 padding: '7px 16px',
-                background: selectedJob?.job_id === job.job_id
-                  ? (isDark ? 'rgba(0,180,216,0.2)' : 'rgba(0,150,200,0.2)')
-                  : (isDark ? 'rgba(0,180,216,0.08)' : 'rgba(0,150,200,0.08)'),
-                color: accent, border: `1px solid ${cardBorder}`,
-                borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
+                background: selectedJob?.job_id === job.job_id ? (isDark ? 'rgba(0,180,216,0.2)' : 'rgba(0,150,200,0.2)') : (isDark ? 'rgba(0,180,216,0.08)' : 'rgba(0,150,200,0.08)'),
+                color: accent, border: `1px solid ${cardBorder}`, borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
               }}>✍️ Cover Letter</button>
 
               <button onClick={() => toggleResume(job)} style={{
                 padding: '7px 16px',
-                background: selectedResumeJob?.job_id === job.job_id
-                  ? (isDark ? 'rgba(0,245,212,0.15)' : 'rgba(0,119,182,0.15)')
-                  : (isDark ? 'rgba(0,245,212,0.06)' : 'rgba(0,119,182,0.06)'),
+                background: selectedResumeJob?.job_id === job.job_id ? (isDark ? 'rgba(0,245,212,0.15)' : 'rgba(0,119,182,0.15)') : (isDark ? 'rgba(0,245,212,0.06)' : 'rgba(0,119,182,0.06)'),
                 color: isDark ? '#00f5d4' : '#0077b6',
                 border: `1px solid ${isDark ? 'rgba(0,245,212,0.2)' : 'rgba(0,119,182,0.2)'}`,
                 borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
@@ -248,27 +216,19 @@ const authHeader = { Authorization: `Bearer ${token}` };
 
               <button onClick={() => handleApply(job)} style={{
                 padding: '7px 16px', background: 'transparent',
-                color: textMuted, border: `1px solid ${cardBorder}`,
-                borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
+                color: textMuted, border: `1px solid ${cardBorder}`, borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
               }}>📋 Mark Applied</button>
             </div>
 
-            {/* Cover Letter inline */}
             {selectedJob?.job_id === job.job_id && (
               <div style={{ marginTop: '16px', borderTop: `1px solid ${cardBorder}`, paddingTop: '16px' }}>
                 <CoverLetter jobTitle={job.job_title} companyName={job.employer_name} isDark={isDark} />
               </div>
             )}
 
-            {/* Resume Generator inline */}
             {selectedResumeJob?.job_id === job.job_id && (
               <div style={{ marginTop: '16px', borderTop: `1px solid ${cardBorder}`, paddingTop: '16px' }}>
-                <ResumeGenerator
-                  jobTitle={job.job_title}
-                  companyName={job.employer_name}
-                  isDark={isDark}
-                  onSave={onSaveResume}
-                />
+                <ResumeGenerator jobTitle={job.job_title} companyName={job.employer_name} isDark={isDark} onSave={onSaveResume} />
               </div>
             )}
           </div>
@@ -278,35 +238,23 @@ const authHeader = { Authorization: `Bearer ${token}` };
       {/* Pagination */}
       {totalPages > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '20px' }}>
-          <button
-            onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
-            disabled={page === 1}
+          <button onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }} disabled={page === 1}
             style={{
               padding: '8px 20px',
               background: page === 1 ? 'transparent' : 'rgba(0,180,216,0.1)',
               color: page === 1 ? '#1e3a5f' : '#00b4d8',
-              border: '1px solid rgba(0,180,216,0.2)',
-              borderRadius: '8px', cursor: page === 1 ? 'not-allowed' : 'pointer',
-              fontSize: '13px',
-            }}
-          >← Prev</button>
-
-          <span style={{ color: textMuted, fontSize: '13px' }}>
-            Page {page} of {totalPages}
-          </span>
-
-          <button
-            onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }}
-            disabled={page === totalPages}
+              border: '1px solid rgba(0,180,216,0.2)', borderRadius: '8px',
+              cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: '13px',
+            }}>← Prev</button>
+          <span style={{ color: textMuted, fontSize: '13px' }}>Page {page} of {totalPages}</span>
+          <button onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }} disabled={page === totalPages}
             style={{
               padding: '8px 20px',
               background: page === totalPages ? 'transparent' : 'rgba(0,180,216,0.1)',
               color: page === totalPages ? '#1e3a5f' : '#00b4d8',
-              border: '1px solid rgba(0,180,216,0.2)',
-              borderRadius: '8px', cursor: page === totalPages ? 'not-allowed' : 'pointer',
-              fontSize: '13px',
-            }}
-          >Next →</button>
+              border: '1px solid rgba(0,180,216,0.2)', borderRadius: '8px',
+              cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: '13px',
+            }}>Next →</button>
         </div>
       )}
     </div>
