@@ -1,6 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
-import CoverLetter from "./CoverLetter";
+import CoverLetter from "./components/CoverLetter";
 import ResumeGenerator from "./ResumeGenerator";
 
 
