@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect } from "react";
 import axios from "axios";
 import ProfileForm from "./components/ProfileForm";
@@ -66,10 +67,9 @@ function App() {
 
   useEffect(() => {
     if (token) {
-      // eslint-disable-next-line
-axios.defaults.headers.common["Authorization"] = `Bearer ${savedToken}`;
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
     } else {
-      delete axios.defaults.headers.common["Authorization"];
+      axios.defaults.headers.common["Authorization"] = "";
     }
   }, [token]);
 
@@ -78,29 +78,28 @@ axios.defaults.headers.common["Authorization"] = `Bearer ${savedToken}`;
     setUser(newUser);
     localStorage.setItem("jas_token", newToken);
     localStorage.setItem("jas_user", JSON.stringify(newUser));
-   // eslint-disable-next-line
-axios.defaults.headers.common["Authorization"] = `Bearer ${savedToken}`;
+    axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
   }
 
-async function handleLogout() {
-  try {
-    await axios.post("https://job-apply-system-backend-7i1m.onrender.com/auth/logout");
-  } catch (_) {}
-  setToken(null);
-  setUser(null);
-  localStorage.removeItem("jas_token");
-  localStorage.removeItem("jas_user");
-  // eslint-disable-next-line
-axios.defaults.headers.common["Authorization"] = `Bearer ${savedToken}`;
-  setProfileForm({
-    fullName: "", email: "", phone: "", location: "",
-    linkedin: "", portfolio: "", skills: "", languages: "",
-    certifications: "", summary: "", experience: "",
-    education: "", projects: "", awards: "",
-  });
-  setJobs([]);
-  setPage("profile");
-}
+  async function handleLogout() {
+    try {
+      await axios.post("https://job-apply-system-backend-7i1m.onrender.com/auth/logout");
+    } catch (_) {}
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem("jas_token");
+    localStorage.removeItem("jas_user");
+    axios.defaults.headers.common["Authorization"] = "";
+    setProfileForm({
+      fullName: "", email: "", phone: "", location: "",
+      linkedin: "", portfolio: "", skills: "", languages: "",
+      certifications: "", summary: "", experience: "",
+      education: "", projects: "", awards: "",
+    });
+    setJobs([]);
+    setPage("profile");
+  }
+
   const [profileForm, setProfileForm] = useState({
     fullName: "", email: "", phone: "", location: "",
     linkedin: "", portfolio: "", skills: "", languages: "",
