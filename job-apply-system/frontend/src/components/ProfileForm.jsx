@@ -12,21 +12,38 @@ const EMPTY_FORM = {
 
 const SLOT_LABELS = ["Profile 1", "Profile 2", "Profile 3"];
 
+function cleanForm(row) {
+  return {
+    fullName:       row.fullName       || "",
+    email:          row.email          || "",
+    phone:          row.phone          || "",
+    location:       row.location       || "",
+    linkedin:       row.linkedin       || "",
+    portfolio:      row.portfolio      || "",
+    skills:         row.skills         || "",
+    languages:      row.languages      || "",
+    certifications: row.certifications || "",
+    summary:        row.summary        || "",
+    experience:     row.experience     || "",
+    education:      row.education      || "",
+    projects:       row.projects       || "",
+    awards:         row.awards         || "",
+  };
+}
+
 function ProfileForm({ isDark, form, setForm, message, setMessage }) {
-  const [activeSlot, setActiveSlot] = useState(1); // 1-indexed to match DB
+  const [activeSlot, setActiveSlot] = useState(1);
   const [slots, setSlots] = useState({ 1: null, 2: null, 3: null });
   const [loadingSlots, setLoadingSlots] = useState(true);
   const [slotMsg, setSlotMsg] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Load all slots from backend on mount
   useEffect(() => {
     async function fetchSlots() {
       setLoadingSlots(true);
       try {
         const { data } = await axios.get(`${BASE}/profile`);
         setSlots({ 1: data["1"] || null, 2: data["2"] || null, 3: data["3"] || null });
-        // Auto-load slot 1 if it exists
         if (data[1]) setForm(cleanForm(data[1]));
       } catch {
         // silent fail
@@ -34,26 +51,7 @@ function ProfileForm({ isDark, form, setForm, message, setMessage }) {
       setLoadingSlots(false);
     }
     fetchSlots();
-  }, []);
-
-  function cleanForm(row) {
-    return {
-      fullName:       row.fullName       || "",
-      email:          row.email          || "",
-      phone:          row.phone          || "",
-      location:       row.location       || "",
-      linkedin:       row.linkedin       || "",
-      portfolio:      row.portfolio      || "",
-      skills:         row.skills         || "",
-      languages:      row.languages      || "",
-      certifications: row.certifications || "",
-      summary:        row.summary        || "",
-      experience:     row.experience     || "",
-      education:      row.education      || "",
-      projects:       row.projects       || "",
-      awards:         row.awards         || "",
-    };
-  }
+  }, [setForm]);
 
   function handleSelectSlot(slotNum) {
     setActiveSlot(slotNum);
@@ -77,7 +75,6 @@ function ProfileForm({ isDark, form, setForm, message, setMessage }) {
     setSaving(true);
     try {
       const response = await axios.post(`${BASE}/profile`, { ...form, slot: activeSlot });
-      // Update local slot cache
       setSlots(prev => ({ ...prev, [activeSlot]: { ...form, slot: activeSlot } }));
       setMessage(response.data.message || "Profile saved!");
     } catch {
@@ -307,7 +304,7 @@ function ProfileForm({ isDark, form, setForm, message, setMessage }) {
           <p style={{ margin: '0 0 4px 0', color: accent, fontSize: '13px', fontWeight: 'bold' }}>Pro Tip</p>
           <p style={{ margin: 0, color: muted, fontSize: '12px' }}>
             Use multiple profiles for different job types — e.g. one for frontend roles, one for full-stack.
-            Click a slot to load it, edit your details, then hit Save. Profiles sync across all your devices.
+            Click a slot to load it, edit your details, then hit Save.
           </p>
         </div>
       </div>
