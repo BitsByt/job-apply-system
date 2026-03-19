@@ -41,13 +41,16 @@ function JobSearch({
     transition: 'background 0.3s, color 0.3s',
   };
 
-  async function handleSearch() {
+ async function handleSearch() {
     if (!title) return setMessage("Please enter a job title.");
     if (source === 'Global (JSearch)' && !location) return setMessage("Please enter a location.");
     setLoading(true);
     setMessage("");
     setSearched(true);
     setPage(1);
+    console.log("Searching:", source, title, location);
+    console.log("Token:", localStorage.getItem('jas_token'));
+    console.log("Axios header:", axios.defaults.headers.common["Authorization"]);
 
     try {
       let response;
@@ -59,7 +62,8 @@ function JobSearch({
       }
       setJobs(response.data || []);
       if (!response.data || response.data.length === 0) setMessage("No jobs found. Try a different search.");
-    } catch {
+    } catch (err) {
+      console.error("Search error:", err?.response?.status, err?.message);
       setMessage("Search failed. Is the backend running?");
     }
     setLoading(false);
