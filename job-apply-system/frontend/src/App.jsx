@@ -1,7 +1,7 @@
 import { useState } from "react";
 import axios from "axios";
 import CoverLetter from "./components/CoverLetter";
-import ResumeGenerator from "./ResumeGenerator";
+import ResumeGenerator from "./components/ResumeGenerator";
 
 const FILTERS = ["Full-time", "Part-time", "Remote", "Fresh Grad", "Internship"];
 const JOBS_PER_PAGE = 10;
