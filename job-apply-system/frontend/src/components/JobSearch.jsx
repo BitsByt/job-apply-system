@@ -20,7 +20,6 @@ function JobSearch({
   onSaveResume,
 }) {
   const [loading, setLoading] = useState(false);
-  const [source, setSource] = useState("Global (JSearch)");
   const [page, setPage] = useState(1);
 
   const safeJobs = jobs || [];
@@ -42,33 +41,24 @@ function JobSearch({
   };
 
  async function handleSearch() {
-    if (!title) return setMessage("Please enter a job title.");
-    if (source === 'Global (JSearch)' && !location) return setMessage("Please enter a location.");
-    setLoading(true);
-    setMessage("");
-    setSearched(true);
-    setPage(1);
-    console.log("Searching:", source, title, location);
-    console.log("Token:", localStorage.getItem('jas_token'));
-    console.log("Axios header:", axios.defaults.headers.common["Authorization"]);
+  if (!title) return setMessage("Please enter a job title.");
+  if (!location) return setMessage("Please enter a location.");
+  setLoading(true);
+  setMessage("");
+  setSearched(true);
+  setPage(1);
 
-    try {
-      let response;
-      if (source === 'Cavite Jobs') {
-        response = await axios.get(`${BASE}/cavitejobs`, { params: { keyword: title } });
-      } else {
-        const query = safeFilters.length > 0 ? `${title} ${safeFilters.join(' ')}` : title;
-        response = await axios.get(`${BASE}/jobs`, { params: { title: query, location } });
-      }
-      setJobs(response.data || []);
-      if (!response.data || response.data.length === 0) setMessage("No jobs found. Try a different search.");
-    } catch (err) {
-      console.error("Search error:", err?.response?.status, err?.message);
-      setMessage("Search failed. Is the backend running?");
-    }
-    setLoading(false);
+  try {
+    const query = safeFilters.length > 0 ? `${title} ${safeFilters.join(' ')}` : title;
+    const response = await axios.get(`${BASE}/jobs`, { params: { title: query, location } });
+    setJobs(response.data || []);
+    if (!response.data || response.data.length === 0) setMessage("No jobs found. Try a different search.");
+  } catch (err) {
+    console.error("Search error:", err?.response?.status, err?.message);
+    setMessage("Search failed. Is the backend running?");
   }
-
+  setLoading(false);
+}
   async function handleApply(job) {
     try {
       await axios.post(`${BASE}/applications`, {
@@ -102,32 +92,14 @@ function JobSearch({
         <p style={{ margin: 0, color: textMuted, fontSize: '13px' }}>Search across thousands of live job listings.</p>
       </div>
 
-      {/* Source Toggle */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', alignItems: 'center' }}>
-        <span style={{ color: textMuted, fontSize: '12px' }}>Source:</span>
-        {['Global (JSearch)', 'Cavite Jobs'].map((s) => (
-          <button key={s}
-            onClick={() => { setSource(s); setJobs([]); setSearched(false); setPage(1); }}
-            style={{
-              padding: '6px 14px', borderRadius: '20px',
-              border: `1px solid ${source === s ? '#00f5d4' : 'rgba(0,180,216,0.2)'}`,
-              background: source === s ? 'rgba(0,245,212,0.15)' : 'transparent',
-              color: source === s ? '#00f5d4' : textMuted,
-              fontSize: '12px', cursor: 'pointer',
-              fontWeight: source === s ? 'bold' : 'normal',
-            }}
-          >{s}</button>
-        ))}
-      </div>
+     
 
       {/* Search Bar */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
         <input style={inputStyle} placeholder="Job Title (e.g. Web Developer)" value={title}
           onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
-        {source === 'Global (JSearch)' && (
-          <input style={{ ...inputStyle, flex: '0 0 200px' }} placeholder="Location (e.g. Manila)" value={location}
-            onChange={(e) => setLocation(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
-        )}
+        <input style={{ ...inputStyle, flex: '0 0 200px' }} placeholder="Location (e.g. Manila)" value={location}
+  onChange={(e) => setLocation(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
         <button onClick={handleSearch} style={{
           padding: '11px 28px', background: 'linear-gradient(135deg, #00b4d8, #00f5d4)',
           color: '#050d1a', border: 'none', borderRadius: '8px',

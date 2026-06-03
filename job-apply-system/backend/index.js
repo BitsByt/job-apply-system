@@ -359,57 +359,7 @@ app.delete('/applications/:id', requireAuth, async (req, res) => {
 });
 
 
-app.get('/cavitejobs', requireAuth, async (req, res) => {
-  const { keyword } = req.query;
-  try {
-    const url = `https://www.cavitejobs.net/?keyword=${encodeURIComponent(keyword)}&jobsite=www.cavitejobs.net`;
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-      }
-    });
-    const html = await response.text();
-    const cheerio = require('cheerio');
-    const $ = cheerio.load(html);
 
-    console.log(`CaviteJobs: HTML length=${html.length}, tr[job_id] count=${$('tr[job_id]').length}`);
-
-    const kw = keyword.toLowerCase();
-    const jobs = [];
-
-    $('tr[job_id]').each((i, el) => {
-      const jobId = $(el).attr('job_id');
-      const title = $(el).find('a').first().text().trim();
-      const company = $(el).find('td').eq(1).text().trim();
-      const location = $(el).find('td').eq(2).text().trim();
-      const posted = $(el).find('td').eq(3).text().trim().split('\n')[0].trim();
-      const salary = $(el).find('.hasTooltip').first().text().trim()
-                  || $(el).find('td').eq(0).find('span').text().trim();
-      if (title) jobs.push({
-        job_id: `cavite_${jobId}`,
-        job_title: title,
-        employer_name: company,
-        job_city: location,
-        job_country: 'PH',
-        job_employment_type: 'Full-time',
-        job_apply_link: `https://www.cavitejobs.net/job-opening/?jobid=${jobId}`,
-        salary: salary || null,
-        posted,
-        source: 'cavitejobs.net'
-      });
-    });
-
-    const filtered = jobs.filter(j => j.job_title.toLowerCase().includes(kw));
-    const result = filtered.length > 0 ? filtered : jobs;
-    console.log(`CaviteJobs: filtered=${filtered.length}, returning=${result.length}`);
-    res.json(result);
-  } catch (err) {
-    console.error('CaviteJobs error:', err.message);
-    res.status(500).json({ message: 'CaviteJobs scraping failed' });
-  }
-});
 
 // ─── Server ──────────────────────────────────────────────────────────────────
 
