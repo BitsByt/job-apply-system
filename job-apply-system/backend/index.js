@@ -363,33 +363,41 @@ app.delete('/applications/:id', requireAuth, async (req, res) => {
 app.get('/cavitejobs', requireAuth, async (req, res) => {
   const { keyword } = req.query;
   try {
-    const response = await fetch(
-      `https://www.cavitejobs.net/?view=recommendedjobs&format=nothtml&ajax=linefeed&feed_num=1&keyword=${encodeURIComponent(keyword)}&joblocation=&jobsite=www.cavitejobs.net&title=&company=&salary=&posted=&empId=&contactemail=&referral=`
-    );
-    const html = await response.text();
+    // Try their RSS/XML feed which doesn't need JS rendering
+    const url = `https://www.cavitejobs.net/feed/?s=${encodeURIComponent(keyword)}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+      }
+    });
+    
+    const xml = await response.text();
+    console.log("Feed response length:", xml.length);
+    console.log("Sample:", xml.substring(0, 300)); // Debug: remove after confirming it works
+    
     const cheerio = require('cheerio');
-    const $ = cheerio.load(html);
+    const $ = cheerio.load(xml, { xmlMode: true });
     const jobs = [];
 
-    $('tr[job_id]').each((i, el) => {
-      const jobId = $(el).attr('job_id');
-      const title = $(el).find('a').first().text().trim();
-      const company = $(el).find('td').eq(1).text().trim();
-      const location = $(el).find('td').eq(2).text().trim();
-      const posted = $(el).find('td').eq(3).text().trim().split('\n')[0].trim();
-      const salary = $(el).find('.hasTooltip').first().text().trim();
+    $('item').each((i, el) => {
+      const title = $(el).find('title').text().trim();
+      const link  = $(el).find('link').text().trim();
+      const desc  = $(el).find('description').text().trim();
+      const pubDate = $(el).find('pubDate').text().trim();
 
       if (title) {
         jobs.push({
-          job_id: `cavite_${jobId}`,
+          job_id: `cavite_${i}_${Date.now()}`,
           job_title: title,
-          employer_name: company,
-          job_city: location,
+          employer_name: 'See listing',
+          job_city: 'Cavite',
           job_country: 'PH',
           job_employment_type: 'Full-time',
-          job_apply_link: `https://www.cavitejobs.net/job-opening/?jobid=${jobId}`,
-          salary: salary || null,
-          posted: posted,
+          job_apply_link: link,
+          salary: null,
+          posted: pubDate,
           source: 'cavitejobs.net'
         });
       }
