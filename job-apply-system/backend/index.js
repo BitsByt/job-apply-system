@@ -359,51 +359,83 @@ app.delete('/applications/:id', requireAuth, async (req, res) => {
 });
 
 
-// CaviteJobs scraper
 app.get('/cavitejobs', requireAuth, async (req, res) => {
   const { keyword } = req.query;
   try {
-    // Try their RSS/XML feed which doesn't need JS rendering
-    const url = `https://www.cavitejobs.net/feed/?s=${encodeURIComponent(keyword)}`;
-    
+    // The site passes keyword as a query param on the homepage
+    const url = `https://www.cavitejobs.net/?keyword=${encodeURIComponent(keyword)}&jobsite=www.cavitejobs.net`;
+
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
       }
     });
-    
-    const xml = await response.text();
-    console.log("Feed response length:", xml.length);
-    console.log("Sample:", xml.substring(0, 300)); // Debug: remove after confirming it works
-    
+
+    const html = await response.text();
     const cheerio = require('cheerio');
-    const $ = cheerio.load(xml, { xmlMode: true });
+    const $ = cheerio.load(html);
     const jobs = [];
 
-    $('item').each((i, el) => {
-      const title = $(el).find('title').text().trim();
-      const link  = $(el).find('link').text().trim();
-      const desc  = $(el).find('description').text().trim();
-      const pubDate = $(el).find('pubDate').text().trim();
+    // Filter rows client-side by keyword since the site does JS filtering
+    const kw = keyword.toLowerCase();
 
-      if (title) {
+    $('tr[job_id]').each((i, el) => {
+      const jobId = $(el).attr('job_id');
+      const title = $(el).find('a').first().text().trim();
+      const company = $(el).find('td').eq(1).text().trim();
+      const location = $(el).find('td').eq(2).text().trim();
+      const posted = $(el).find('td').eq(3).text().trim().split('\n')[0].trim();
+      const salary = $(el).find('.hasTooltip').first().text().trim()
+                  || $(el).find('td').eq(0).find('span').text().trim();
+
+      // Since the site filters via JS, do keyword filtering server-side
+      if (title && title.toLowerCase().includes(kw)) {
         jobs.push({
-          job_id: `cavite_${i}_${Date.now()}`,
+          job_id: `cavite_${jobId}`,
           job_title: title,
-          employer_name: 'See listing',
-          job_city: 'Cavite',
+          employer_name: company,
+          job_city: location,
           job_country: 'PH',
           job_employment_type: 'Full-time',
-          job_apply_link: link,
-          salary: null,
-          posted: pubDate,
+          job_apply_link: `https://www.cavitejobs.net/job-opening/?jobid=${jobId}`,
+          salary: salary || null,
+          posted: posted,
           source: 'cavitejobs.net'
         });
       }
     });
 
-    res.json(jobs);
+    // If keyword filter yields nothing, return all jobs (broad search fallback)
+    const result = jobs.length > 0 ? jobs : (() => {
+      const all = [];
+      $('tr[job_id]').each((i, el) => {
+        const jobId = $(el).attr('job_id');
+        const title = $(el).find('a').first().text().trim();
+        const company = $(el).find('td').eq(1).text().trim();
+        const location = $(el).find('td').eq(2).text().trim();
+        const posted = $(el).find('td').eq(3).text().trim().split('\n')[0].trim();
+        const salary = $(el).find('.hasTooltip').first().text().trim()
+                    || $(el).find('td').eq(0).find('span').text().trim();
+        if (title) all.push({
+          job_id: `cavite_${jobId}`,
+          job_title: title,
+          employer_name: company,
+          job_city: location,
+          job_country: 'PH',
+          job_employment_type: 'Full-time',
+          job_apply_link: `https://www.cavitejobs.net/job-opening/?jobid=${jobId}`,
+          salary: salary || null,
+          posted,
+          source: 'cavitejobs.net'
+        });
+      });
+      return all;
+    })();
+
+    console.log(`CaviteJobs: found ${result.length} jobs for keyword "${keyword}"`);
+    res.json(result);
   } catch (err) {
     console.error('CaviteJobs error:', err.message);
     res.status(500).json({ message: 'CaviteJobs scraping failed' });
